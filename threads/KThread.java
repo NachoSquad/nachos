@@ -295,13 +295,8 @@ public class KThread {
 
     //initialize a special queue for the joined threads to execute on 
      if(joinQueue == null) {
-          joinQueue = ThreadedKernel.scheduler.newThreadQueue(true);
-         
-          
-          
-          joinQueue.acquire(this);
-         
-          
+          joinQueue = ThreadedKernel.scheduler.newThreadQueue(true);       
+          joinQueue.acquire(this);       
       }
 
     //handle multiple joined requests. A waiting thread needs to be put to sleep while waiting 
@@ -489,15 +484,7 @@ public class KThread {
       testThread.fork();
       
       t2.join(); 
-      
-      
-      
-      
      
- 
-     
-     
-
     yield(); 
     
     }

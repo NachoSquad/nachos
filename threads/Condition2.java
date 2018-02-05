@@ -1,5 +1,7 @@
 package nachos.threads;
 
+
+
 import nachos.machine.*;
 
 /**
@@ -32,9 +34,11 @@ public class Condition2 {
      */
     public void sleep() {
 	Lib.assertTrue(conditionLock.isHeldByCurrentThread());
-
 	conditionLock.release();
-
+	boolean interruptStatus = Machine.interrupt().disable(); 
+	zzzQueue.add(KThread.currentThread());
+	KThread.sleep(); //nighty night 
+	Machine.interrupt().restore(interruptStatus);
 	conditionLock.acquire();
     }
 
@@ -44,6 +48,10 @@ public class Condition2 {
      */
     public void wake() {
 	Lib.assertTrue(conditionLock.isHeldByCurrentThread());
+	boolean interruptStatus = Machine.interrupt().disable(); 
+	KThread waked_thread = zzzQueue.removeFirst(); 
+	waked_thread.ready();
+	Machine.interrupt().restore(interruptStatus);
     }
 
     /**
@@ -52,7 +60,11 @@ public class Condition2 {
      */
     public void wakeAll() {
 	Lib.assertTrue(conditionLock.isHeldByCurrentThread());
+	zzzQueue.equals(null)
+	
     }
 
     private Lock conditionLock;
+    private SynchList zzzQueue; 
+    
 }
