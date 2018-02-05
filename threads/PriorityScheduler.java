@@ -179,6 +179,12 @@ public class PriorityScheduler extends Scheduler {
 		/** The priority of the associated thread. */
 		protected int priority;
 
+		protected final List<PriorityQueue> currentResources;
+
+		protected final List<PriorityQueue> waitingResources;
+
+		protected int effectivePriority = priorityMinimum;
+
 		/**
 		 * Allocate a new <tt>ThreadState</tt> object and associate it with the
 		 * specified thread.
@@ -224,8 +230,19 @@ public class PriorityScheduler extends Scheduler {
 		 * @return	the effective priority of the associated thread.
 		 */
 		public int getEffectivePriority() {
-			// implement me
-			return priority;
+			if (this.currentResources.isEmpty()) {
+				return this.getPriority();
+			}
+
+			if (this.priorityChange) {
+				this.effectivePriority = this.getPriority();
+				for (final PriorityQueue pq : this.resourcesIHave) {
+					this.effectivePriority = Math.max(this.effectivePriority, pq.getEffectivePriority());
+				}
+				this.priorityChange = false;
+			}
+
+			return this.effectivePriority;
 		}
 
 		/**
@@ -241,7 +258,7 @@ public class PriorityScheduler extends Scheduler {
 		 * @see	nachos.threads.ThreadQueue#waitForAccess
 		 */
 		public void waitForAccess(PriorityQueue waitQueue) {
-			// implement me
+			this.waitingResources.add(waitQueue);
 		}
 
 		/**
@@ -255,7 +272,9 @@ public class PriorityScheduler extends Scheduler {
 		 * @see	nachos.threads.ThreadQueue#nextThread
 		 */
 		public void acquire(PriorityQueue waitQueue) {
-			// implement me
+			this.currentResources.add(waitQueue);
+			this.waitingResources.remove(waitQueue);
 		}
+
 	}
 }
