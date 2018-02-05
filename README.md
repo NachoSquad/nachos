@@ -24,3 +24,7 @@ git push origin master              # pushes your commits to the server
 ```
 
 For more information about git, [click here](https://try.github.io/levels/1/challenges/1)
+
+## FAQ
+**Q: Why does the `nachos` file in `proj1` not show up on the github?**\
+That folder is not needed to write code with and is only used by your compiler, it is ignored in our `.gitignore` file at the root of the directory!
