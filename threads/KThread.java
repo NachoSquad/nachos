@@ -1,5 +1,4 @@
 package nachos.threads;
-
 import nachos.machine.*;
 
 /**
@@ -11,7 +10,7 @@ import nachos.machine.*;
  * method. An instance of the class can then be allocated, passed as an
  * argument when creating <tt>KThread</tt>, and forked. For example, a thread
  * that computes pi could be written as follows:
- *
+ 
  * <p><blockquote><pre>
  * class PiRun implements Runnable {
  *     public void run() {
@@ -186,6 +185,18 @@ public class KThread {
 	
 	Machine.interrupt().disable();
 
+	 ThreadQueue currentJoinQueue = currentThread.joinQueue; 
+	
+	if(currentJoinQueue != null) {
+		KThread thread = currentJoinQueue.nextThread(); 
+		
+		while(thread != null) {
+			thread.ready();
+			thread = currentJoinQueue.nextThread(); 
+		}	
+	}
+	
+	
 	Machine.autoGrader().finishingCurrentThread();
 
 	Lib.assertTrue(toBeDestroyed == null);
@@ -193,6 +204,8 @@ public class KThread {
 
 
 	currentThread.status = statusFinished;
+	
+	
 	
 	sleep();
     }
@@ -221,6 +234,7 @@ public class KThread {
 	boolean intStatus = Machine.interrupt().disable();
 
 	currentThread.ready();
+	
 
 	runNextThread();
 	
@@ -273,10 +287,27 @@ public class KThread {
      * thread.
      */
     public void join() {
-	Lib.debug(dbgThread, "Joining to thread: " + toString());
+	   Lib.debug(dbgThread, "Joining to thread: " + toString());
+	   Lib.assertTrue(this != currentThread);
+	
+	   //disable interrupts , our thread needs to finish without any interruptions
+     boolean boolStatus = Machine.interrupt().disable(); 
 
-	Lib.assertTrue(this != currentThread);
+    //initialize a special queue for the joined threads to execute on 
+     if(joinQueue == null) {
+          joinQueue = ThreadedKernel.scheduler.newThreadQueue(true);       
+          joinQueue.acquire(this);       
+      }
 
+    //handle multiple joined requests. A waiting thread needs to be put to sleep while waiting 
+      if(currentThread != this && status != statusFinished) {
+          joinQueue.waitForAccess(currentThread);
+          currentThread.sleep(); 
+     }
+
+      //re-enable interrupts
+      Machine.interrupt().restore(boolStatus);
+	
     }
 
     /**
@@ -386,11 +417,15 @@ public class KThread {
 	    this.which = which;
 	}
 	
+	
+	
 	public void run() {
+		
 	    for (int i=0; i<5; i++) {
 		System.out.println("*** thread " + which + " looped "
 				   + i + " times");
 		currentThread.yield();
+		    
 	    }
 	}
 
@@ -406,6 +441,55 @@ public class KThread {
 	new KThread(new PingTest(1)).setName("forked thread").fork();
 	new PingTest(0).run();
     }
+    
+    //JOIN TEST 
+    public static void JoinTest () {
+    
+    Runnable runnablecode = new Runnable() {  //runnable target for our test thread 
+    	 
+    	    public void run() {
+    	    	int i = 0; 
+    	    	while (i<10) {
+    	    		System.out.println("*** Runnable looped" + i + "times ***");
+    	    		i++; 
+    	    	} 	
+    	    }    	
+    };
+    
+     testThread = new KThread(runnablecode); 
+     testThread.setName("first joined thread"); 
+   
+  
+     Runnable runnablecode2 = new Runnable() {  //runnable target for our test thread 
+    	 
+ 	    public void run() {
+ 	    	
+ 	    	testThread.join(); 
+ 	    	
+ 	    	int i = 0; 
+ 	    	while (i<10) {
+ 	    		System.out.println("*** Runnable2 looped" + i + "times ***");
+ 	    		i++; 
+ 	    	} 	
+ 	    }    	
+ };
+     
+      KThread t2= new KThread(runnablecode2); 
+      t2.setName("Second joined Thread"); 
+      
+      System.out.println("***Forking Thread t2 ... ***\n");
+      t2.fork();
+      
+      System.out.println("***Forking Thread test thread ... ***\n");
+      testThread.fork();
+      
+      t2.join(); 
+     
+    yield(); 
+    
+    }
+    
+  
 
     private static final char dbgThread = 't';
 
@@ -432,6 +516,8 @@ public class KThread {
     private Runnable target;
     private TCB tcb;
 
+    private ThreadQueue joinQueue = null; 
+    
     /**
      * Unique identifer for this thread. Used to deterministically compare
      * threads.
@@ -439,9 +525,11 @@ public class KThread {
     private int id = numCreated++;
     /** Number of times the KThread constructor was called. */
     private static int numCreated = 0;
-
+   
     private static ThreadQueue readyQueue = null;
     private static KThread currentThread = null;
     private static KThread toBeDestroyed = null;
     private static KThread idleThread = null;
+    
+    private static KThread testThread = null; 
 }
