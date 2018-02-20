@@ -144,7 +144,12 @@ public class PriorityScheduler extends Scheduler {
 
 		public KThread nextThread() {
 			Lib.assertTrue(Machine.interrupt().disabled());
-			// implement me
+
+			ThreadState threadState = pickNextThread();
+			if ( threadState != null) {
+				return threadState.thread;
+			}
+
 			return null;
 		}
 
@@ -156,13 +161,33 @@ public class PriorityScheduler extends Scheduler {
 		 *		return.
 		 */
 		protected ThreadState pickNextThread() {
-			// implement me
-			return null;
+
+			if (waitQueue.isEmpty()) {
+				return null;
+			}
+
+			int cursor = waitQueue.size() - 1;
+
+			for (int i = waitQueue.size() - 2; i >= 0; i--) {
+				if (waitQueue.get(i).effectivePriority >= waitQueue.get(cursor).effectivePriority) {
+					cursor = i;
+				}
+			}
+
+			return waitQueue.remove(cursor);
 		}
 
 		public void print() {
 			Lib.assertTrue(Machine.interrupt().disabled());
 			// implement me (if you want)
+		}
+
+		protected void add(ThreadState threadState) {
+			waitQueue.add(threadState);
+		}
+
+		protected boolean isEmpty() {
+			return waitQueue.isEmpty();
 		}
 	}
 
@@ -212,6 +237,7 @@ public class PriorityScheduler extends Scheduler {
 		 * @param	priority	the new priority.
 		 */
 		public void setPriority(int priority) {
+			/* sets the priority of a specific thread */
 			if (this.priority == priority)
 				return;
 
@@ -220,8 +246,6 @@ public class PriorityScheduler extends Scheduler {
 				return;
 
 			this.priority = priority;
-
-			// implement me
 		}
 
 		/**
