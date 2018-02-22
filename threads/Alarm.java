@@ -27,9 +27,23 @@ public class Alarm {
      * that should be run.
      */
     public void timerInterrupt() {
+    	
+    //iterate through waitingQueue and check for expired waiters 
+    	for(int i = 0; i < waitingQueue.size(); i++) {
+    		waitingData currentWaiter = waitingQueue.get(i); 
+    		
+    		//check if waiter is done waiting 
+    		if(currentWaiter.wakeTime <= Machine.timer().getTime()) {
+    			currentWaiter.waitLock.release();
+    			waitingQueue.remove(i);  			
+    		}	
+    	}
+    	
 	KThread.currentThread().yield();
+	
     }
-
+    
+   
     /**
      * Put the current thread to sleep for at least <i>x</i> ticks,
      * waking it up in the timer interrupt handler. The thread must be
@@ -47,7 +61,29 @@ public class Alarm {
     public void waitUntil(long x) {
 	// for now, cheat just to get something working (busy waiting is bad)
 	long wakeTime = Machine.timer().getTime() + x;
+	boolean status = Machine.interrupt().disable(); 
+	
+	waitingData waiter = new waitingData(wakeTime); 
+	waitingQueue.add(waiter);
+	System.out.println("Thread waiting: " + KThread.currentThread().getName() + " waiting until: " + wakeTime);
+	
 	while (wakeTime > Machine.timer().getTime())
 	    KThread.yield();
     }
+    
+    
+ private SynchList waitingQueue = new SynchList(); 
+    
+    
+    private static class waitingData {
+    	public long wakeTime; 
+    	
+    	public waitingData(long wakeTime) { 
+    		this.wakeTime = wakeTime; 
+    	
+    	}
+    	
+    }
+    
+    
 }
