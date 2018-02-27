@@ -104,7 +104,7 @@ public class Boat {
     }
 
     static void AdultItinerary() {
-        bg.initializeAdult(); //Required for autograder interface. Must be the first thing called.
+        //bg.initializeAdult(); //Required for autograder interface. Must be the first thing called.
 
         Oahu.acquire();
 
@@ -123,7 +123,7 @@ public class Boat {
     }
 
     static void ChildItinerary()  {
-        bg.initializeChild(); //Required for autograder interface. Must be the first thing called.
+        //bg.initializeChild(); //Required for autograder interface. Must be the first thing called.
 
         while (OahuChildCount + OahuAdultCount > 1) {
                 Oahu.acquire();

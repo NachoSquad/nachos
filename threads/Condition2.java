@@ -3,6 +3,7 @@ package nachos.threads;
 
 
 
+import java.util.LinkedList;
 import java.util.List;
 
 import nachos.machine.*;
@@ -53,7 +54,7 @@ public class Condition2 {
 	Lib.assertTrue(conditionLock.isHeldByCurrentThread());
 	boolean interruptStatus = Machine.interrupt().disable(); 
 	KThread waked_thread; 
-	waked_thread = zzzQueue.remove(0);    	
+	waked_thread = zzzQueue.removeFirst();    	
 	waked_thread.ready();
 	Machine.interrupt().restore(interruptStatus);
     }
@@ -69,6 +70,6 @@ public class Condition2 {
     }
 
     private Lock conditionLock;
-    private List<KThread> zzzQueue; 
+    private LinkedList<KThread> zzzQueue = new LinkedList<KThread>(); 
     
 }

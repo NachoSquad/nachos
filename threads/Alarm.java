@@ -85,6 +85,7 @@ public class Alarm {
     	
     	public waitingData(long wakeTime) { 
     		this.wakeTime = wakeTime; 
+    		this.waitLock = waitLock; 
     	
     	}
     	
