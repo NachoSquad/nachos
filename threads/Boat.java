@@ -17,12 +17,13 @@ public class Boat {
 
 
     // count variables
-    private int OahuChildCount = 0;
-    private int MolokiChildCount = 0;
-    private int OahuAdultCount = 0;
-    private int MolokiAdultCount = 0;
-    private int ChildWaitingForBoat = 0;
-    private int ChildOnBoat = 0;
+    private static int OahuChildCount = 0;
+    private static int MolokiChildCount = 0;
+    private static int OahuAdultCount = 0;
+    private static int MolokiAdultCount = 0;
+    private static int childWaitingForBoatCount = 0;
+    private static int ChildOnBoat = 0;
+    private static int OahuPopulation = 0; 
 
     private static boolean boatIsAtOahu = false;
 
@@ -30,10 +31,12 @@ public class Boat {
     private static Lock Oahu = new Lock();
     private static Lock Moloki = new Lock();
 
-    private static Condition adultOahu = new Condition(Oahu);
-    private static Condition childWaitingOnOahu = new Condition(Moloki);
-    private static Condition childWaitingOnMoloki = new Condition(Oahu);
-    private static Condition childWaitingForBoat = new Condition(Oahu);
+    private static Condition2 adultOahu = new Condition2(Oahu);
+    private static Condition2 childWaitingOnOahu = new Condition2(Moloki);
+    private static Condition2 childWaitingOnMoloki = new Condition2(Oahu);
+    private static Condition2 childWaitingForBoat = new Condition2(Oahu);
+    
+    private static Communicator arrivalMessage = new Communicator(); 
 
     //the main thread waits until our code says it's done
     private static Semaphore done = new Semaphore(0);
@@ -64,19 +67,40 @@ public class Boat {
         ChildOnBoat = 0;
         boatIsAtOahu = true;
 
-        children.forEach(() => {
-                new KThread(new Runnable () { public void run() { ChildItinerary(); } }).setName("child" + i).fork();
-        })
-
-        adults.forEach(() => {
-                new KThread(new Runnable () { public void run() { AdultItinerary(); } }).setName("adult" + i).fork();
+        for(int i = 0; i < OahuChildCount; i++) {
+        	 
+        	KThread childThread = new KThread(new Runnable () {
+        		public void run() {
+        			ChildItinerary(); 
+        		}	
+        	}); 
+        	
+        	childThread.setName("child" + i); 
+        	childThread.fork();   	
         }
+        
+        
+        for(int i = 0; i < OahuAdultCount; i++) {
+       	 
+        	KThread adultThread = new KThread(new Runnable () {
+        		public void run() {
+        			AdultItinerary(); 
+        		}	
+        	}); 
+        	
+        	adultThread.setName("adult" + i); 
+        	adultThread.fork();   	
+        }
+        
+        
+      
 
         int MolokiPopulation = arrivalMessage.listen();
 
-        if(MolokiPopulation == sum(children + adults) {
-            done()
+        if(MolokiPopulation == (MolokiChildCount+ MolokiAdultCount)) { 
+            done.V();
         }
+        
     }
 
     static void AdultItinerary() {
@@ -84,17 +108,17 @@ public class Boat {
 
         Oahu.acquire();
 
-        while (OahuChildCount > 1 || !boatAtOahu) {
+        while (OahuChildCount > 1 || !boatIsAtOahu) {
             adultOahu.sleep(); /* sleep till no children or boat */
         }
 
         OahuAdultCount--;
-        boatAtOahu.release();
+        Oahu.release();
         bg.AdultRowToMolokai();
-        islandMolokai.aquire();
+        Moloki.acquire();
         MolokiAdultCount++;
-        childWaitingForBoat.wake() /* wake child now */
-        Molokai.release(); /* release this adult */
+        childWaitingForBoat.wake();  /* wake child now */
+        Moloki.release(); /* release this adult */
 
     }
 
@@ -102,65 +126,68 @@ public class Boat {
         bg.initializeChild(); //Required for autograder interface. Must be the first thing called.
 
         while (OahuChildCount + OahuAdultCount > 1) {
-                Oahu.aquire();
+                Oahu.acquire();
 
             if (OahuChildCount == 1) {
                 adultOahu.wake();
             }
 
-            while (childWaitingForBoat >= 2 || !boatAtOahu) {
+            while (childWaitingForBoatCount >= 2 || !boatIsAtOahu) {
                 childWaitingOnOahu.sleep();
             }
 
-            if childWaitingForBoat == 0 {
+            if (childWaitingForBoatCount == 0) {
                 // no children waiting
                 childWaitingForBoatCount++;
                 childWaitingOnOahu.wake(); // get sum frends
                 childWaitingForBoat.sleep();
-                boatgrader.ChildRideToMolokai();
+                bg.ChildRideToMolokai();
                 childWaitingForBoat.wake();
             } else {
                 childWaitingForBoatCount++;
                 childWaitingForBoat.wake();
-                boatgrader.ChildRowToMolokai();
+                bg.ChildRowToMolokai();
                 childWaitingForBoat.sleep();
             }
 
             // we left oahu
+            
             childWaitingForBoatCount--;
             OahuChildCount--;
-            boatAtOahu = false;
+            OahuPopulation = (OahuChildCount) + (OahuAdultCount); 
+            boatIsAtOahu = false;
             Oahu.release();
 
-
+            
+            
             // we arrive at Molokai
-            arrivalMessage.speak(Oahupopulation);
-            Molokai.aquire();
+            arrivalMessage.speak(OahuPopulation);
+            Moloki.acquire();
             MolokiChildCount++;
 
-            if (childrenFromBoat == 1) {
-                childrenWaitingOnMolokai.sleep();
+            if (ChildOnBoat == 1) {
+                childWaitingOnMoloki.sleep();
             }
 
-            childrenFromBoat = 0;
-            Molokai.release();
+            ChildOnBoat = 0;
+            Moloki.release();
 
             // we go back to oahu with one child to collect more
-            boatgrader.ChildRowToOahu();
-            Oahu.aquire();
+            bg.ChildRowToOahu();
+            Oahu.acquire();
             OahuChildCount++;
-            boatAtOahu = true;
+            boatIsAtOahu = true;
             Oahu.release();
         }
 
         // check who’s on the original island
-        oahu.aquire();
+        Oahu.acquire();
         OahuChildCount--;
-        oahu.release();
-        boatgrader.ChildRowToMolokai();
-        Molokai.aquire();
+        Oahu.release();
+        bg.ChildRowToMolokai();
+        Moloki.acquire();
         MolokiChildCount++;
-        Molokai.release();
+        Moloki.release();
         
         System.out.println("Children A/B: " + OahuChildCount + " / " + MolokiChildCount);
         System.out.println("Adults A/B: " + OahuAdultCount + " / " + MolokiAdultCount);
