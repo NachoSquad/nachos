@@ -1,5 +1,6 @@
 package nachos.threads;
-
+import java.util.LinkedList;
+import java.util.List; 
 import nachos.machine.*;
 
 /**
@@ -35,6 +36,9 @@ public class PriorityScheduler extends Scheduler {
 	 * The maximum priority that a thread can have. Do not change this value.
 	 */
 	public static final int priorityMaximum = 7;
+	
+	
+	public static LinkedList<ThreadState> waitQueue = new LinkedList<ThreadState>(); 
 
 	/**
 	 * Allocate a new priority scheduler.
@@ -204,11 +208,13 @@ public class PriorityScheduler extends Scheduler {
 		/** The priority of the associated thread. */
 		protected int priority;
 
-		protected final List<PriorityQueue> currentResources;
+		protected final LinkedList<PriorityQueue> currentResources = new LinkedList<PriorityQueue>();
 
-		protected final List<PriorityQueue> waitingResources;
+		protected final LinkedList<PriorityQueue> waitingResources = new LinkedList<PriorityQueue>();
 
 		protected int effectivePriority = priorityMinimum;
+		
+		protected boolean priorityChange; 
 
 		/**
 		 * Allocate a new <tt>ThreadState</tt> object and associate it with the
@@ -257,11 +263,12 @@ public class PriorityScheduler extends Scheduler {
 			if (this.currentResources.isEmpty()) {
 				return this.getPriority();
 			}
-
+			
+			
 			if (this.priorityChange) {
 				this.effectivePriority = this.getPriority();
-				for (final PriorityQueue pq : this.resourcesIHave) {
-					this.effectivePriority = Math.max(this.effectivePriority, pq.getEffectivePriority());
+				for (final PriorityQueue pq : this.currentResources) {
+					this.effectivePriority = Math.max(this.effectivePriority, pq.pickNextThread().getEffectivePriority());
 				}
 				this.priorityChange = false;
 			}
