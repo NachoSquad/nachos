@@ -62,12 +62,10 @@ public class Communicator {
     	
     	//**message becomes available**
     	while(messageAvailable == false) {
-<<<<<<< HEAD
+
     		//currentSpeaker.wake();
     		currentListener.sleep();
-=======
     		
->>>>>>> 5a64ce6972295b6e60a1557af1a69a26b1f9e10b
     	}
     	currentSpeaker.wake();
     	
