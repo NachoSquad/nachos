@@ -1,6 +1,7 @@
 package nachos.threads;
 
 import nachos.machine.*;
+import java.util.List; 
 
 /**
  * Uses the hardware timer to provide preemption, and to allow threads to sleep
@@ -66,19 +67,22 @@ public class Alarm {
 	boolean status = Machine.interrupt().disable(); 
 	
 	waitingData waiter = new waitingData(wakeTime); 
+	waiter.waitLock.acquire();
 	waitingQueue.add(waiter);
 	System.out.println("Thread waiting: " + KThread.currentThread().getName() + " waiting until: " + wakeTime);
 	
 	while (wakeTime > Machine.timer().getTime())
 	    KThread.yield();
+	
     }
     
     
- private SynchList waitingQueue = new SynchList(); 
+ private List<waitingData> waitingQueue; 
     
     
     private static class waitingData {
     	public long wakeTime; 
+    	public Lock waitLock; 
     	
     	public waitingData(long wakeTime) { 
     		this.wakeTime = wakeTime; 
