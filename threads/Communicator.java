@@ -65,9 +65,10 @@ public class Communicator {
     	
     	//**message becomes available**
     	while(messageAvailable == false) {
-    		currentSpeaker.wake();
+    		//currentSpeaker.wake();
     		currentListener.sleep();
     	}
+    	currentSpeaker.wake();
     	
     	int receivedMessage = this.message; 
     	messageAvailable= false; 
