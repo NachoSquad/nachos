@@ -17,6 +17,9 @@ public class Alarm {
      * alarm.
      */
     public Alarm() {
+    	
+    	waitingQueue = new LinkedList<waitingData>(); 
+    	
 	Machine.timer().setInterruptHandler(new Runnable() {
 		public void run() { timerInterrupt(); }
 	    });
@@ -30,20 +33,22 @@ public class Alarm {
      */
     public void timerInterrupt() {
     	
-    //iterate through waitingQueue and check for expired waiters 
-    	for(int i = 0; i < waitingQueue.size(); i++) {
-    		waitingData currentWaiter = waitingQueue.get(i); 
-    		
-    		//check if waiter is done waiting 
-    		if(currentWaiter.wakeTime <= Machine.timer().getTime()) {
-    			currentWaiter.waitLock.release();
-    			waitingQueue.remove(i);  			
-    		}	
-    	}
+   
     	
-	KThread.currentThread().yield();
-	
-    }
+    	boolean status = Machine.interrupt().disable(); 
+    	
+     	
+    
+    	while(!waitingQueue.isEmpty() && waitingQueue.getFirst().wakeTime <= Machine.timer().getTime()) {
+    		waitingData currentwaiter = waitingQueue.getFirst(); 
+    		currentwaiter.thread.ready();
+    		waitingQueue.remove(currentwaiter); 	
+    		Lib.assertTrue(currentwaiter.wakeTime <= Machine.timer().getTime());
+    } 
+    	
+    	KThread.yield();
+    	Machine.interrupt().restore(status);
+  }
     
    
     /**
@@ -61,34 +66,33 @@ public class Alarm {
      * @see	nachos.machine.Timer#getTime()
      */
     public void waitUntil(long x) {
-	// for now, cheat just to get something working (busy waiting is bad)
+	
 	long wakeTime = Machine.timer().getTime() + x;
+    KThread waitingThread = KThread.currentThread(); 
 	boolean status = Machine.interrupt().disable(); 
 	
-	waitingData waiter = new waitingData(wakeTime); 
-	waiter.waitLock.acquire();
+	waitingData waiter = new waitingData(wakeTime,waitingThread); 
 	waitingQueue.add(waiter);
-	System.out.println("Thread waiting: " + KThread.currentThread().getName() + " waiting until: " + wakeTime);
 	
-	while (wakeTime > Machine.timer().getTime())
-	    KThread.yield();
+	
+	KThread.sleep(); 
+	
+	Machine.interrupt().restore(status);
+	
 	
     }
     
     
- private LinkedList<waitingData> waitingQueue = new LinkedList<waitingData>(); 
-    
+ private LinkedList<waitingData> waitingQueue;  
     
     private static class waitingData {
-    	public long wakeTime; 
-    	public Lock waitLock; 
+    long wakeTime; 
+    	KThread thread; 
     	
-    	public waitingData(long wakeTime) { 
+    	public waitingData(long wakeTime,KThread thread) { 
     		this.wakeTime = wakeTime; 
-    		this.waitLock = waitLock; 
-    	
-    	}
-    	
+    		this.thread = thread; 
+       	} 	
     }
     
     
