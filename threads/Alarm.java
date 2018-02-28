@@ -31,7 +31,9 @@ public class Alarm {
      * that should be run.
      */
     public void timerInterrupt() {
-    
+    	
+   
+    	
     	boolean status = Machine.interrupt().disable(); 
     	
     	//check if there are no waiting threads
@@ -86,17 +88,10 @@ public class Alarm {
 	
     }
     
-
- //   
- private LinkedList<waitingData> waitingQueue;  
-    
-    private static class waitingData {
-
   //implements Comparable, this priorityqueue is sorted in ascending wakeTime order 
  private PriorityQueue<waitingData> waitingQueue = new PriorityQueue<waitingData>();  
     
     private static class waitingData implements Comparable<waitingData> {
-
     long wakeTime; 
     	KThread thread; 
     	
@@ -116,5 +111,5 @@ public class Alarm {
     	} 	
     }
     
-    }
+    
 }

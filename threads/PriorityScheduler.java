@@ -194,6 +194,11 @@ public class PriorityScheduler extends Scheduler {
 		protected boolean isEmpty() {
 			return waitQueue.isEmpty();
 		}
+
+		public int getEffectivePriority() {
+			// TODO Auto-generated method stub
+			return 0;
+		}
 	}
 
 	/**
