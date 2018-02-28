@@ -17,6 +17,9 @@ public class Alarm {
      * alarm.
      */
     public Alarm() {
+    	
+    	waitingQueue = new LinkedList<waitingData>(); 
+    	
 	Machine.timer().setInterruptHandler(new Runnable() {
 		public void run() { timerInterrupt(); }
 	    });
@@ -80,7 +83,7 @@ public class Alarm {
     }
     
     
- private LinkedList<waitingData> waitingQueue = new LinkedList<waitingData>(); 
+ private LinkedList<waitingData> waitingQueue;  
     
     private static class waitingData {
     long wakeTime; 
