@@ -10,20 +10,26 @@ import nachos.machine.*;
  * threads can be paired off at this point.
  */
 public class Communicator {
-    /**
-     * Allocate a new communicator.
-     */
+   
 	
-	private Lock communicationLock = new Lock(); 
-	private Condition2 currentSpeaker = new Condition2(communicationLock); 
-	private Condition2 currentListener = new Condition2(communicationLock); 
+	private Lock communicationLock; 
+	private Condition2 condSpeakers; 
+	private Condition2 condListeners; 
+	private Condition2 condHandshake; 
 	private int speakerCount = 0; 
 	private int listenerCount = 0; 
 	private int message = 0; 
 	private boolean messageAvailable; 
 	
-	
+	 /**
+     * Allocate a new communicator.
+     */
     public Communicator() {
+    	this.messageAvailable = false; 
+    	this.communicationLock = new Lock();
+    	this.condSpeakers = new Condition2(communicationLock); 
+    	this.condListeners = new Condition2(communicationLock); 
+    	this.condHandshake = new Condition2(communicationLock); 
     }
 
     /**
@@ -37,17 +43,18 @@ public class Communicator {
      * @param	word	the integer to transfer.
      */
     public void speak(int word) {
+    	communicationLock.acquire();
     	speakerCount++; 
-    	while(listenerCount == 0) {
-    		
-    	}
-    	currentSpeaker.sleep();	
     	
-    	//**listener becomes available** 
+    	while(messageAvailable) {
+    		condSpeakers.sleep(); 
+    	}
+    	
+    	
     	this.message = word; 
-    	messageAvailable = true; 
-    	currentListener.wake();
-    	--speakerCount; 
+    this.messageAvailable = true; 
+    	condListeners.wake();
+    	condHandshake.sleep(); 
     	communicationLock.release();
     }
 
@@ -58,19 +65,19 @@ public class Communicator {
      * @return	the integer transferred.
      */    
     public int listen() {
-    	listenerCount++; 
-    	
-    	//**message becomes available**
-    	while(messageAvailable == false) {
-    		
+    	int receivedMessage; 
+    	communicationLock.acquire();
+    
+    	while(!messageAvailable) {
+    		condListeners.sleep(); 
     	}
     	
-      	currentSpeaker.wake();
-		currentListener.sleep();
+    receivedMessage = this.message; 
+    	this.messageAvailable= false; 
     	
-    	int receivedMessage = this.message; 
-    	messageAvailable= false; 
-    	--listenerCount; 
+    	condSpeakers.wake(); 
+    	condHandshake.wake(); 
+    communicationLock.release(); 
 	return receivedMessage;
     }
 }

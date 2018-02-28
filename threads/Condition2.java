@@ -28,6 +28,7 @@ public class Condition2 {
      */
     public Condition2(Lock conditionLock) {
 	this.conditionLock = conditionLock;
+	zzzQueue = new LinkedList<KThread>(); 
     }
 
     /**
@@ -76,6 +77,6 @@ public class Condition2 {
     }
 
     private Lock conditionLock;
-    private LinkedList<KThread> zzzQueue = new LinkedList<KThread>(); 
+    private LinkedList<KThread> zzzQueue; 
     
 }
