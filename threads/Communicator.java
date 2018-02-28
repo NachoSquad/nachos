@@ -37,6 +37,7 @@ public class Communicator {
      * @param	word	the integer to transfer.
      */
     public void speak(int word) {
+    	
     	speakerCount++; 
     	while(listenerCount == 0) {
     		
@@ -75,6 +76,9 @@ public class Communicator {
     	int receivedMessage = this.message; 
     	messageAvailable= false; 
     	--listenerCount; 
-	return receivedMessage;
+    	
+    	return receivedMessage;
     }
+    
 }
+
