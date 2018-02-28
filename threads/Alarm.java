@@ -32,12 +32,8 @@ public class Alarm {
      * that should be run.
      */
     public void timerInterrupt() {
-    	
-   
-    	
+    
     	boolean status = Machine.interrupt().disable(); 
-    	
-     	
     
     	while(!waitingQueue.isEmpty() && waitingQueue.getFirst().wakeTime <= Machine.timer().getTime()) {
     		waitingData currentwaiter = waitingQueue.getFirst(); 
@@ -82,7 +78,7 @@ public class Alarm {
 	
     }
     
-    
+ //   
  private LinkedList<waitingData> waitingQueue;  
     
     private static class waitingData {
