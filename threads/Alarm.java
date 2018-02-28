@@ -1,6 +1,6 @@
 package nachos.threads;
 import nachos.machine.*;
-import java.util.LinkedList;
+import java.util.PriorityQueue;
 
 /**
  * Uses the hardware timer to provide preemption, and to allow threads to sleep
@@ -17,8 +17,7 @@ public class Alarm {
      * alarm.
      */
     public Alarm() {
-    	
-    	waitingQueue = new LinkedList<waitingData>(); 
+    
     	
 	Machine.timer().setInterruptHandler(new Runnable() {
 		public void run() { timerInterrupt(); }
@@ -37,16 +36,23 @@ public class Alarm {
     	
     	boolean status = Machine.interrupt().disable(); 
     	
-     	
+    	//check if there are no waiting threads
+     	if(waitingQueue.isEmpty()) {
+     		return; 
+     	}
+     	//not time yet 
+     	if(waitingQueue.peek().wakeTime > Machine.timer().getTime()) {
+     		return; 	
+     	}
     
-    	while(!waitingQueue.isEmpty() && waitingQueue.getFirst().wakeTime <= Machine.timer().getTime()) {
-    		waitingData currentwaiter = waitingQueue.getFirst(); 
+    	while(!waitingQueue.isEmpty() && waitingQueue.peek().wakeTime <= Machine.timer().getTime()) {
+    		waitingData currentwaiter = (waitingData) waitingQueue.peek(); 
     		currentwaiter.thread.ready();
     		waitingQueue.remove(currentwaiter); 	
     		Lib.assertTrue(currentwaiter.wakeTime <= Machine.timer().getTime());
     } 
     	
-    	KThread.yield();
+    //	KThread.yield();
     	Machine.interrupt().restore(status);
   }
     
@@ -71,7 +77,7 @@ public class Alarm {
     KThread waitingThread = KThread.currentThread(); 
 	boolean status = Machine.interrupt().disable(); 
 	
-	waitingData waiter = new waitingData(wakeTime,waitingThread); 
+	waitingData waiter = new waitingData(wakeTime,waitingThread);
 	waitingQueue.add(waiter);
 	
 	
@@ -82,10 +88,10 @@ public class Alarm {
 	
     }
     
+  //implements Comparable, this priorityqueue is sorted in ascending wakeTime order 
+ private PriorityQueue<waitingData> waitingQueue = new PriorityQueue<waitingData>();  
     
- private LinkedList<waitingData> waitingQueue;  
-    
-    private static class waitingData {
+    private static class waitingData implements Comparable<waitingData> {
     long wakeTime; 
     	KThread thread; 
     	
@@ -93,6 +99,16 @@ public class Alarm {
     		this.wakeTime = wakeTime; 
     		this.thread = thread; 
        	} 	
+    	
+    	public int compareTo(waitingData comparee) {
+    		if(this.wakeTime > comparee.wakeTime) {
+    			return 1; 
+    		}else if(this.wakeTime < comparee.wakeTime) {
+    			return -1; 
+    		} else {
+    			return 0; 
+    		}	
+    	} 	
     }
     
     
