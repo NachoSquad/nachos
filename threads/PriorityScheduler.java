@@ -144,9 +144,9 @@ public class PriorityScheduler extends Scheduler {
 		public KThread nextThread() {
 			Lib.assertTrue(Machine.interrupt().disabled());
 
-			if (lockHolder != null) {
-				lockHolder.donationQueue.remove(this);
-				lockHolder.update();
+			if (lock != null) {
+				lock.queue.remove(this);
+				lock.updateEffecitvePriority();
 			}
 			ThreadState threadState = pickNextThread();
 			if (threadState != null) {
@@ -167,12 +167,13 @@ public class PriorityScheduler extends Scheduler {
 		protected ThreadState pickNextThread() {
 			KThread result = null;
 			int maxPriority = -1;
-			for (KThread thread : waitQueue)
-				if (result == null
-						|| getEffectivePriority(thread) > maxPriority) {
+			for (KThread thread : waitQueue) {
+				if (result == null || getEffectivePriority(thread) > maxPriority) {
 					result = thread;
 					maxPriority = getEffectivePriority(thread);
 				}
+			}
+
 			if (result == null) {
 				return null;
 			}
@@ -191,7 +192,7 @@ public class PriorityScheduler extends Scheduler {
 		 */
 		public boolean transferPriority;
 		LinkedList<KThread> waitQueue = new LinkedList<KThread>();
-		ThreadState lockHolder = null;
+		ThreadState lock = null;
 	}
 
 	/**
@@ -229,28 +230,28 @@ public class PriorityScheduler extends Scheduler {
 		 * @return	the effective priority of the associated thread.
 		 */
 		public int getEffectivePriority() {
-			if (set.contains(this)) {
+			if (globalEffectivePriorityHandler.contains(this)) {
 				return priority;
 			}
 
+			// set effective priority
 			effectivePriority = priority;
 
-			for (PriorityQueue queue : donationQueue) {
+			for (PriorityQueue queue : queue) {
 				if (queue.transferPriority) {
 					for (KThread thread : queue.waitQueue) {
-						set.add(this);
-						int p = getThreadState(thread).getEffectivePriority();
+						globalEffectivePriorityHandler.add(this);
+						int localPriority = getThreadState(thread).getEffectivePriority();
 
-						set.remove(this);
-						if (p > effectivePriority) {
-							effectivePriority = p;
+						globalEffectivePriorityHandler.remove(this);
+						if (localPriority > effectivePriority) {
+							effectivePriority = localPriority;
 						}
 					}
 				}
 			}
 
-
-			set = new HashSet<ThreadState>();
+			globalEffectivePriorityHandler = new HashSet<ThreadState>(); // clear the manager
 
 			return effectivePriority;
 		}
@@ -261,12 +262,21 @@ public class PriorityScheduler extends Scheduler {
 		 * @param	priority	the new priority.
 		 */
 		public void setPriority(int priority) {
-			if (this.priority == priority)
+			if (this.priority == priority) {
 				return;
+			}
+
+			if (priority > priorityMaximum) {
+				return;
+			}
+
+			if (priority < priorityMinimum) {
+				return;
+			}
 
 			this.priority = priority;
 
-			update();
+			updateEffecitvePriority();
 		}
 
 		/**
@@ -283,10 +293,12 @@ public class PriorityScheduler extends Scheduler {
 		 */
 		public void waitForAccess(PriorityQueue waitQueue) {
 			waitQueue.waitQueue.add(thread);
-			if (waitQueue.lockHolder == null) {
+
+			if (waitQueue.lock == null) {
 				return;
 			}
-			waitQueue.lockHolder.update();
+
+			waitQueue.lock.updateEffecitvePriority();
 		}
 
 		/**
@@ -301,13 +313,13 @@ public class PriorityScheduler extends Scheduler {
 		 */
 		public void acquire(PriorityQueue waitQueue) {
 			waitQueue.waitQueue.remove(thread);
-			waitQueue.lockHolder = this;
-			donationQueue.add(waitQueue);
-			update();
+			waitQueue.lock = this;
+			queue.add(waitQueue);
+			updateEffecitvePriority();
 		}
 
-		public void update() {
-			effectivePriority = expiredEffectivePriority;
+		public void updateEffecitvePriority() {
+			effectivePriority = -1; // effective priority is bunk
 			getEffectivePriority();
 		}
 
@@ -317,8 +329,7 @@ public class PriorityScheduler extends Scheduler {
 		protected int priority;
 
 		protected int effectivePriority = expiredEffectivePriority;
-		protected static final int expiredEffectivePriority = -1;
-		protected HashSet<ThreadState> set = new HashSet<ThreadState>();
-		protected LinkedList<PriorityQueue> donationQueue = new LinkedList<PriorityQueue>();
+		protected LinkedList<PriorityQueue> queue = new LinkedList<PriorityQueue>();
+		protected HashSet<ThreadState> globalEffectivePriorityHandler = new HashSet<ThreadState>();
 	}
 }
