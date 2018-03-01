@@ -23,7 +23,7 @@ public class Boat {
     private static int MolokiAdultCount = 0;
     private static int childWaitingForBoatCount = 0;
     private static int ChildOnBoat = 0;
-    private static int OahuPopulation = 0; 
+
 
     private static boolean boatIsAtOahu = false;
 
@@ -33,7 +33,7 @@ public class Boat {
 
     private static Condition2 adultOahu = new Condition2(Oahu);
     private static Condition2 childWaitingOnOahu = new Condition2(Moloki);
-    private static Condition2 childWaitingOnMoloki = new Condition2(Oahu);
+    private static Condition2 childWaitingOnMoloki = new Condition2(Moloki);
     private static Condition2 childWaitingForBoatA = new Condition2(Oahu);
 
 
