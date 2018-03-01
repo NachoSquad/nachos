@@ -144,9 +144,9 @@ public class PriorityScheduler extends Scheduler {
 		public KThread nextThread() {
 			Lib.assertTrue(Machine.interrupt().disabled());
 
-			if (state != null) {
-				state.queue.remove(this);
-				state.updateEffecitvePriority();
+			if (lock != null) {
+				lock.lockQueue.remove(this);
+				lock.updateEffecitvePriority();
 			}
 			ThreadState threadState = pickNextThread();
 			if (threadState != null) {
@@ -165,23 +165,20 @@ public class PriorityScheduler extends Scheduler {
 		 *		return.
 		 */
 		protected ThreadState pickNextThread() {
-			KThread nextThread = null;
-
-			// keep getting that highest priority value
+			KThread result = null;
 			int maxPriority = -1;
 			for (KThread thread : waitQueue) {
-				if (nextThread == null || getEffectivePriority(thread) > maxPriority) {
-					nextThread = thread;
+				if (result == null || getEffectivePriority(thread) > maxPriority) {
+					result = thread;
 					maxPriority = getEffectivePriority(thread);
 				}
 			}
-		
-			// or we die
-			if (nextThread == null) {
+
+			if (result == null) {
 				return null;
 			}
 
-			return getThreadState(nextThread);
+			return getThreadState(result);
 		}
 
 		public void print() {
@@ -193,9 +190,9 @@ public class PriorityScheduler extends Scheduler {
 		 * <tt>true</tt> if this queue should transfer priority from waiting
 		 * threads to the owning thread.
 		 */
-		LinkedList<KThread> waitQueue = new LinkedList<KThread>();
 		public boolean transferPriority;
-		ThreadState state = null; // locks the thread
+		LinkedList<KThread> waitQueue = new LinkedList<KThread>();
+		ThreadState lock = null;
 	}
 
 	/**
@@ -240,11 +237,10 @@ public class PriorityScheduler extends Scheduler {
 			// set effective priority
 			effectivePriority = priority;
 
-			for (PriorityQueue queue : queue) {
+			for (PriorityQueue queue : lockQueue) {
 				if (queue.transferPriority) {
 					for (KThread thread : queue.waitQueue) {
 						globalEffectivePriorityHandler.add(this);
-
 						int localPriority = getThreadState(thread).getEffectivePriority();
 
 						globalEffectivePriorityHandler.remove(this);
@@ -298,11 +294,11 @@ public class PriorityScheduler extends Scheduler {
 		public void waitForAccess(PriorityQueue waitQueue) {
 			waitQueue.waitQueue.add(thread);
 
-			if (waitQueue.state == null) {
+			if (waitQueue.lock == null) {
 				return;
 			}
 
-			waitQueue.state.updateEffecitvePriority();
+			waitQueue.lock.updateEffecitvePriority();
 		}
 
 		/**
@@ -317,8 +313,8 @@ public class PriorityScheduler extends Scheduler {
 		 */
 		public void acquire(PriorityQueue waitQueue) {
 			waitQueue.waitQueue.remove(thread);
-			waitQueue.state = this;
-			queue.add(waitQueue);
+			waitQueue.lock = this;
+			lockQueue.add(waitQueue);
 			updateEffecitvePriority();
 		}
 
@@ -333,7 +329,7 @@ public class PriorityScheduler extends Scheduler {
 		protected int priority;
 
 		protected int effectivePriority = -1;
-		protected LinkedList<PriorityQueue> queue = new LinkedList<PriorityQueue>();
+		protected LinkedList<PriorityQueue> lockQueue = new LinkedList<PriorityQueue>();
 		protected HashSet<ThreadState> globalEffectivePriorityHandler = new HashSet<ThreadState>();
 	}
 }
