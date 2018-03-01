@@ -189,37 +189,13 @@ public class PriorityScheduler extends Scheduler {
 			// implement me (if you want)
 		}
 
-
-		protected void add(ThreadState threadState) {
-			waitQueue.add(threadState);
-		}
-
-		protected boolean isEmpty() {
-			return waitQueue.isEmpty();
-		}
-
-		/**public int getEffectivePriority() {
-			// TODO Auto-generated method stub
-			return 0;
-		}
-		*/
-
 		/**
 		 * <tt>true</tt> if this queue should transfer priority from waiting
 		 * threads to the owning thread.
 		 */
 		LinkedList<KThread> waitQueue = new LinkedList<KThread>();
-
-
-		ThreadState lockHolder = null;
-
-
-		ThreadState lock = null;
-
-
 		public boolean transferPriority;
 		ThreadState state = null; // locks the thread
-
 	}
 
 	/**
