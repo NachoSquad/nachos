@@ -328,7 +328,7 @@ public class PriorityScheduler extends Scheduler {
 		/** The priority of the associated thread. */
 		protected int priority;
 
-		protected int effectivePriority = expiredEffectivePriority;
+		protected int effectivePriority = -1;
 		protected LinkedList<PriorityQueue> queue = new LinkedList<PriorityQueue>();
 		protected HashSet<ThreadState> globalEffectivePriorityHandler = new HashSet<ThreadState>();
 	}
