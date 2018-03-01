@@ -195,10 +195,11 @@ public class PriorityScheduler extends Scheduler {
 			return waitQueue.isEmpty();
 		}
 
-		public int getEffectivePriority() {
+		/**public int getEffectivePriority() {
 			// TODO Auto-generated method stub
 			return 0;
 		}
+		*/
 	}
 
 	/**
