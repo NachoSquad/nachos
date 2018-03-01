@@ -125,7 +125,7 @@ public class Boat {
     static void ChildItinerary()  {
         //bg.initializeChild(); //Required for autograder interface. Must be the first thing called.
 
-        while (OahuChildCount + OahuAdultCount > 1) {
+        while (OahuChildCount + OahuAdultCount >= 1) {
                 Oahu.acquire();
 
             if (OahuChildCount == 1) {
@@ -141,12 +141,12 @@ public class Boat {
                 childWaitingForBoatCount++;
                 childWaitingOnOahu.wake(); // get sum frends
                 childWaitingForBoat.sleep();
-                bg.ChildRideToMolokai();
+                //bg.ChildRideToMolokai();
                 childWaitingForBoat.wake();
             } else {
                 childWaitingForBoatCount++;
                 childWaitingForBoat.wake();
-                bg.ChildRowToMolokai();
+                //bg.ChildRowToMolokai();
                 childWaitingForBoat.sleep();
             }
 
@@ -177,7 +177,25 @@ public class Boat {
             Oahu.acquire();
             OahuChildCount++;
             boatIsAtOahu = true;
+            
+          
+            
+            
+            
             Oahu.release();
+            
+
+            for(int i = 0; i < 1; i++) {
+            	Oahu.acquire();
+            	Oahu.release();
+            	bg.ChildRideToMolokai();
+            	Moloki.acquire();
+            	MolokiChildCount++; 
+            	Moloki.release();
+            }
+            
+            
+            
         }
 
         // check who’s on the original island
@@ -188,6 +206,8 @@ public class Boat {
         Moloki.acquire();
         MolokiChildCount++;
         Moloki.release();
+        
+        
         
         System.out.println("Children A/B: " + OahuChildCount + " / " + MolokiChildCount);
         System.out.println("Adults A/B: " + OahuAdultCount + " / " + MolokiAdultCount);

@@ -45,6 +45,7 @@ public class Alarm {
      		return; 	
      	}
     
+     	// our priority queue is already sorted from descending to ascending order so we just check the first element of the waitingQueue and 
     	while(!waitingQueue.isEmpty() && waitingQueue.peek().wakeTime <= Machine.timer().getTime()) {
     		waitingData currentwaiter = (waitingData) waitingQueue.peek(); 
     		currentwaiter.thread.ready();
@@ -100,6 +101,7 @@ public class Alarm {
     		this.thread = thread; 
        	} 	
     	
+    	//compareTo method provides logic for sorting our Wake Times 
     	public int compareTo(waitingData comparee) {
     		if(this.wakeTime > comparee.wakeTime) {
     			return 1; 
