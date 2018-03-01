@@ -142,12 +142,12 @@ public class Boat {
                 childWaitingForBoatCount++;
                 childWaitingOnOahu.wake(); // get sum frends
                 childWaitingForBoat.sleep();
-                //bg.ChildRideToMolokai();
+                bg.ChildRideToMolokai();
                 childWaitingForBoat.wake();
             } else {
                 childWaitingForBoatCount++;
                 childWaitingForBoat.wake();
-                //bg.ChildRowToMolokai();
+                bg.ChildRowToMolokai();
                 childWaitingForBoat.sleep();
             }
 
@@ -198,7 +198,7 @@ public class Boat {
         
        
         
-/
+
         
         System.out.println("Children A/B: " + OahuChildCount + " / " + MolokiChildCount);
         System.out.println("Adults A/B: " + OahuAdultCount + " / " + MolokiAdultCount);
