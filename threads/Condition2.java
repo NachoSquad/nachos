@@ -79,4 +79,60 @@ public class Condition2 {
     private Lock conditionLock;
     private LinkedList<KThread> zzzQueue; 
     
+    //TEST 
+    
+    private static class Condition2Test implements Runnable {
+    	Condition2Test(Lock lock, Condition2 condition) {
+    	        this.condition = condition;
+            this.lock = lock;
+    	}
+    	
+    	public void run() {
+            lock.acquire();
+            condition.sleep();
+            System.out.print(KThread.currentThread().getName() + " reacquired lock \n");	
+            lock.release();
+            System.out.print(KThread.currentThread().getName() + " released lock \n");	
+    	}
+
+        private Lock lock; 
+        private Condition2 condition; 
+        }
+    
+    public static void selfTest() {
+
+        System.out.print("Condition2 Test");	
+
+        Lock lock = new Lock();
+        Condition2 conditionTest = new Condition2(lock); 
+
+        KThread t[] = new KThread[10];
+    	for (int i=0; i<10; i++) { //fork many new condition2 threads 
+             t[i] = new KThread(new Condition2Test(lock, conditionTest));
+             t[i].setName("Thread" + i).fork();
+    	}
+
+        KThread.yield();
+        
+        lock.acquire();
+
+        System.out.print("Test Wake\n");	
+        conditionTest.wake();
+
+        System.out.print("Test Wake All\n");	
+        conditionTest.wakeAll();
+
+        lock.release();
+
+        System.out.print("Done Condition2 Testing\n");	
+
+
+            
+        }
+    
+    
+    
+    
+    
+    
 }
