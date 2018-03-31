@@ -509,16 +509,16 @@ public class UserProcess {
 		}                                                                  
 
 		UserProcess childProcess = UserProcess.newUserProcess();
-		childProcess.ppid = this.pid;
+		childProcess.parentID = this.pid;
 
 		this.children.add(childProcess.pid);
-		Lib.debug(dbgProcess, Type + "Created new child process with id " + childProcess.ppid);
+		Lib.debug(dbgProcess, Type + "Created new child process with id " + childProcess.parentID);
 
 		// execute child process and create new thread
 		boolean retval = childProcess.execute(filename, args);             
 
 		if (retval) {                                                      
-			return childProcess.pid;                                       
+			return childProcess.pid;
 		} else {
 			return -1;                                                     
 		}
@@ -647,4 +647,22 @@ public class UserProcess {
 	
     private static final int pageSize = Processor.pageSize;
     private static final char dbgProcess = 'a';
+
+	// process id
+	private int pid;
+
+	// parent's process id
+	private int parentID;
+
+	// child processes
+	private LinkedList<int> children = new LinkedList<int>();
+
+	// exit status
+	private int exitStatus;
+
+	// exit condition
+	private int exitStatus;
+
+	/* user thread that's associated with this process                  */
+	private UThread thread;                                       
 }

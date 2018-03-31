@@ -107,9 +107,75 @@ public class UserKernel extends ThreadedKernel {
 	super.terminate();
     }
 
+	// return a number to free page
+	public static int getFreePage() {                              
+		int pageNumber = -1;                                       
+		Machine.interrupt().disable();
+
+		if (pageTable.isEmpty() == false) {
+			pageNumber = pageTable.removeFirst();
+		}
+
+		Machine.interrupt().enable();                               
+		return pageNumber;                                         
+	}                                                              
+
+	// add a free page to linkedlist
+	public static void addFreePage(int pageNumber) {               
+		Lib.assertTrue(pageNumber >= 0 && pageNumber < Machine.processor().getNumPhysPages());
+		Machine.interrupt().disable();                               
+		pageTable.add(pageNumber);                                   
+		Machine.interrupt().enable();                                
+	}                                                               
+
+
+	// get next available pid
+	public static int getNextPid() {                                
+		int val;                                                
+		Machine.interrupt().disable();
+		val = nextPid + 1;                                         
+		Machine.interrupt().enabled();                              
+		return nextPid;                                            
+	}                                                              
+
+	// get process by id
+	public static UserProcess getProcessByID(int pid) {
+		return processMap.get(pid);
+	}
+
+	// register a process in a kernal
+	public static UserProcess registerProcess(int pid, UserProcess process) {  
+		UserProcess insertedProcess;                                
+		Machine.interrupt().disable();                              
+		insertedProcess = processMap.put(pid, process);             
+		Machine.interrupt().enabled();                              
+		return insertedProcess;                                     
+	}                                                              
+
+	// unregister a process
+	public static UserProcess unregisterProcess(int pid) {         
+		UserProcess deletedProcess;                                 
+		Machine.interrupt().disable();                              
+
+		deletedProcess = processMap.remove(pid);                    
+
+		Machine.interrupt().enabled();                              
+
+		return deletedProcess;                                      
+	}
+
     /** Globally accessible reference to the synchronized console. */
     public static SynchConsole console;
 
     // dummy variables to make javac smarter
     private static Coff dummy1 = null;
+
+	private static LinkedList<Integer> pageTable = new LinkedList<Integer>();              
+
+	// the next user id
+	private static int nextPid = 0;                                
+
+	// map of all processes
+	private static HashMap<Integer, UserProcess> processMap = new HashMap<Integer, UserProcess>();     
+
 }
