@@ -18,6 +18,7 @@ import java.io.EOFException;
  * @see	nachos.vm.VMProcess
  * @see	nachos.network.NetProcess
  */
+
 public class UserProcess {
     /**
      * Allocate a new process.
@@ -311,8 +312,7 @@ public class UserProcess {
 			coff.close();
 			return false;
 		}
-		pageTable[i] = new TranslationEntry(
-						i, physPage, true, false, false);
+		pageTable[i] = new TranslationEntry(i, physPage, true, false, false);
 	}
 
 	// load sections
@@ -429,17 +429,17 @@ public class UserProcess {
     	case syscallHalt:
     		return handleHalt();
     	case syscallCreate:
-    		return handleCreate(a0);
+    		return Creat(a0);
     	case syscallOpen: 
-    		return handleOpen(a0);
+    		return Open(a0);
     	case syscallRead:
-    		return handlRead(a0, a1, a2);
+    		return Read(a0, a1, a2);
     	case syscallWrite:
-    		return handleWrite(a0, a1, a2);
+    		return Write(a0, a1, a2);
     	case syscallClose:
-    		return handleClose(a0);
+    		return Close(a0);
     	case syscallUnlink:
-    		return handleUnlink(a0);
+    		return Unlink(a0);
     		
     case syscallExit:
     	handleExit(a0);
@@ -494,6 +494,141 @@ public class UserProcess {
     	return filedescriptor;
     }
     
+    
+    private int Read(int a0, int a1, int a2) {                      
+	   
+        int handle = a0;                    
+        int vaddr = a1;                                
+        int bufsize = a2;                                    
+
+        // get data about file descriptor
+        if (handle < 0 || handle > 16|| fds[handle].file == null)                              
+            return -1;                                                    
+
+        if (bufsize < 0) {                                                          
+            return  -1;                                                   
+        }                                                                
+        else if (bufsize == 0) {                                                               
+            return 0;                                                    
+        }                                                                 
+
+        FileDescriptor fd = fds[handle];                                 
+        byte[] buf = new byte[bufsize];                                   
+
+        // invoke read through classOpenFileWithPosition                        
+        //rather than class StubFileSystem                                     
+        int rnum = fd.file.read(buf, 0, bufsize);                      
+
+        if (rnum < 0) {                                                
+            return -1;                                                    
+        }                                                                 
+        else {                                                            
+            int wnum = writeVirtualMemory(vaddr, buf, 0, rnum);    
+            if (wnum < 0) {                                           
+                return -1;                                                
+            }                                                             
+            else {                                                        
+            //fd.position = fd.position + writenum;                         
+               return wnum;                                           
+            }                                                             
+        }                                                                 
+    }    
+    private int Write(int a0, int a1, int a2) {
+	    Lib.debug(dbgProcess, "handleWrite()");                           
+         
+        int fhandle = a0;                 //a0 is file descriptor handle 
+        int bufadd = a1;                  // a1 is buf address            
+        int bufsize = a2;                // a2 is buf size               
+        int retval;                                                         
+
+	 
+        // if its an invalid file
+        if (fhandle < 0 || fhandle >16                                  
+                || fds[fhandle].file == null) {                                                
+            return -1;                                                    
+        }                                                                 
+
+        FileDescriptor fd = fds[fhandle];                                  
+
+        if (bufsize < 0) {                                                              
+            return  -1;                                                   
+        }                                                                 
+        else if (bufsize == 0) {                                                                   
+            return 0;                                                     
+        }                                                                 
+
+
+        byte[] buf = new byte[bufsize];                                     
+
+        int bytesRead = readVirtualMemory(bufadd, buf);                       
+
+        if (bytesRead < 0) {                                              
+            return -1;                                                    
+        }                                                                 
+
+        // invoke write through stubFilesystem                            
+        retval = fd.file.write(buf, 0, bytesRead);                        
+        
+        if (retval < 0) {                                                 
+            return -1;                                                    
+        }                                                                 
+        else {                                                            
+            // classOpenFileWithPostion will maintain a position                
+            // fd.position = fd.position + retval;                        
+            return retval;                                               
+            }                                                              
+    }
+
+    private int Close(int a0) {                                    
+	    
+        int handle = a0;                                                  
+        if (a0 < 0 || a0 >= 16)                                        
+            return -1;                                                    
+
+        boolean retval = true;                                           
+
+        FileDescriptor fd = fds[handle];                                  
+
+        //fd.position = 0;                                                 
+        fd.file.close();                                                  
+        fd.file = null;                                                   
+
+        // remove this file if necessary                                  
+        if (fd.toRemove) {                                               
+        retval = UserKernel.fileSystem.remove(fd.filename);           
+            fd.toRemove = false;                                            
+        }                                                                 
+
+        fd.filename = "";                                                 
+
+        return retval ? 0 : -1;                                           
+    }     
+    
+    private int Unlink(int a0) {
+	  
+
+        boolean retval = true;
+
+        // a0 is address of filename 
+        String filename = readVirtualMemoryString(a0, 256);        
+
+	             
+
+        int fileHandle = findFileDescriptorByName(filename);             
+        if (fileHandle < 0) {                                            
+         //if its not being used remove it from filesystem
+            retval = UserKernel.fileSystem.remove(filename);             
+        }                                                                  
+        else {// else close the file first then remove it                                                           
+            fds[fileHandle].toRemove = true;                             
+            Close(fileHandle);                                     
+            retval = UserKernel.fileSystem.remove(filename);             
+        }                                                                 
+
+        return retval ? 0 : -1;                                           
+    }
+
+    
     /**
      * Handle a user exception. Called by
      * <tt>UserKernel.exceptionHandler()</tt>. The
@@ -526,7 +661,28 @@ public class UserProcess {
 	    Lib.assertNotReached("Unexpected exception");
 		}
     }
+    
+    private int findFileDescriptorByName(String filename) { 
+        
+        for (int i = 0; i < 16; i++) {                
+            if (fds[i].filename.equals(filename))           
+                return i;                                   
+        }                                                 
 
+        return -1;                                         
+    }  
+
+public class FileDescriptor {                                 
+    public FileDescriptor() {                                
+    }                                                         
+    private  String   filename = "";   // opened file name    
+    private  OpenFile file = null;     // opened file object  
+    //private  int      position = 0;  // IO position           
+
+    private  boolean  toRemove = false;// if need to remove   
+                                       // this file           
+}
+private FileDescriptor fds[] = new FileDescriptor[16];
     /** The program being run by this process. */
     protected Coff coff;
 
