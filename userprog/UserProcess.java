@@ -525,71 +525,68 @@ public class UserProcess {
 	}
 
 	private int handleExit(int exitStatus) {
-
+		Lib.debug(dbgProcess, "handleExit()");
+		String Type = "[UserProcess][handleExit] ";
+		for(int i =0; i< 16; i++)
+		{
+			if(fds[i].file != null)
+				handleClose(i);
+		}
+		while(children != null && !children.isEmpty())
+		{
+			int childProcessID=children.removeFirst();
+			UserProcess childProcess = UserKernel.getProcessByID(childProcessId);
+			childProcess.ppid=ROOT;
+			
+		}
+		this.exitStatus =exitStatus;
+		Lib.debug(dbgProcess, "exitStates : " + exitStatus);
+		this.unloadSections();
+		if(processID == 0)
+		{
+			Kernel.kernel.terminate();
+		}
+		else
+		{
+			UThread.finish();
+		}
+		Lib.assertNotReached();
 	}
 
     public int handleSyscall(int syscall, int a0, int a1, int a2, int a3) {
-<<<<<<< HEAD
+
     	switch (syscall) {
     	case syscallHalt:
     		return handleHalt();
     	case syscallCreate:
-    		return Creat(a0);
+    		return handleCreat(a0);
     	case syscallOpen: 
-    		return Open(a0);
+    		return handleOpen(a0);
     	case syscallRead:
-    		return Read(a0, a1, a2);
+    		return handleRead(a0, a1, a2);
     	case syscallWrite:
-    		return Write(a0, a1, a2);
+    		return handleWrite(a0, a1, a2);
     	case syscallClose:
-    		return Close(a0);
+    		return handleClose(a0);
     	case syscallUnlink:
-    		return Unlink(a0);
-    		
+    		return handleUnlink(a0);
     case syscallExit:
-    	handleExit(a0);
-    case syscallException:
-    	return handleException(a0, a1, a2);
+    		return handleExit(a0);
+    case syscallExec:
+     	return handleExec(a0,a1,a2);
     case syscallJoin:
     	return handleJoin(a0, a1);
     		
 	default:
 	    Lib.debug(dbgProcess, "Unknown syscall " + syscall);
 	    Lib.assertNotReached("Unknown system call!");
-=======
-	switch (syscall) {
-		case syscallHalt:
-			return handleHalt();
-		case syscallCreate:
-			return handleCreate(a0);
-		case syscallOpen:
-			return handleOpen(a0);
-		case syscallRead:
-			return handlRead(a0, a1, a2);
-		case syscallWrite:
-			return handleWrite(a0, a1, a2);
-		case syscallClose:
-			return handleClose(a0);
-		case syscallUnlink:
-			return handleUnlink(a0);
-		case syscallExit:
-			return handleExit(a0);
-		case syscallExec:
-			return handleExec(a0);
-		case syscallJoin:
-			return handleJoin(a0, a1);
-		case syscallException:
-			return handleException(a0, a1, a2);
-		default:
-			Lib.debug(dbgProcess, "Unknown syscall " + syscall);
-			Lib.assertNotReached("Unknown system call!");
->>>>>>> 4e73b497f21736c33b0848c26112fdfe91fe52d9
+
 	}
 	return 0;
     }
 
    
-    private int Open(int a0) {
+    private int handleOpen(int a0) {
     	String filename = this.readVirtualMemoryString(a0, 255);
     	if (filename == null) {
     		return -1;
@@ -607,7 +604,7 @@ public class UserProcess {
     	
     }
     
-    private int Creat(int a0) {
+    private int handleCreat(int a0) {
     	String filename = this.readVirtualMemoryString(a0,  255);
     	if (filename == null) {
     		return -1;
@@ -628,7 +625,7 @@ public class UserProcess {
     }
     
     
-    private int Read(int a0, int a1, int a2) {                      
+    private int handleRead(int a0, int a1, int a2) {                      
 	   
         int handle = a0;                    
         int vaddr = a1;                                
@@ -666,7 +663,7 @@ public class UserProcess {
             }                                                             
         }                                                                 
     }    
-    private int Write(int a0, int a1, int a2) {
+    private int handleWrite(int a0, int a1, int a2) {
 	    Lib.debug(dbgProcess, "handleWrite()");                           
          
         int fhandle = a0;                 //a0 is file descriptor handle 
@@ -712,7 +709,7 @@ public class UserProcess {
             }                                                              
     }
 
-    private int Close(int a0) {                                    
+    private int handleClose(int a0) {                                    
 	    
         int handle = a0;                                                  
         if (a0 < 0 || a0 >= 16)                                        
@@ -737,7 +734,7 @@ public class UserProcess {
         return retval ? 0 : -1;                                           
     }     
     
-    private int Unlink(int a0) {
+    private int handleUnlink(int a0) {
 	  
 
         boolean retval = true;
@@ -754,7 +751,7 @@ public class UserProcess {
         }                                                                  
         else {// else close the file first then remove it                                                           
             fds[fileHandle].toRemove = true;                             
-            Close(fileHandle);                                     
+            handleClose(fileHandle);                                     
             retval = UserKernel.fileSystem.remove(filename);             
         }                                                                 
 
@@ -845,8 +842,7 @@ private FileDescriptor fds[] = new FileDescriptor[16];
 	// exit status
 	private int exitStatus;
 
-	// exit condition
-	private int exitStatus;
+	
 
 	/* user thread that's associated with this process                  */
 	private UThread thread;                                       
