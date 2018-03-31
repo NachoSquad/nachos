@@ -387,11 +387,121 @@ public class UserProcess {
      * @param	a3	the fourth syscall argument.
      * @return	the value to be returned to the user.
      */
-    public int handleSyscall(int syscall, int a0, int a1, int a2, int a3) {
+
+	private int handleJoin(int childProcessId, int status) {
+		Lib.debug(dbgProcess, "handleJoin()");
+		String Type = "[UserProcess][handleJoin] ";
+
+		boolean flag = false;
+		int tmp = 0;                                                 
+		Iterator<int> it = this.children.iterator();
+
+		while(it.hasNext()) {                                             
+			tmp = it.next();                                         
+			if (tmp == childProcessId) {
+				it.remove();                                              
+				flag = true;
+				break;                                                    
+			}                                                             
+		}                                                                 
+
+		if (flag == false) {
+			Lib.debug(dbgProcess, Type + "Process" + this.pid + " does not have a child with id (" + childProcessId + ")");
+			return -1;                                                    
+		}                                                                 
+
+		// check if child has exited
+		UserProcess childProcess = UserKernel.getProcessByID(childProcessId);
+
+		if (childProcess == null) {
+			Lib.debug(dbgProcess, Type + "Child process " + childProcessId + " has already been joined!");
+			return -2;                                                    
+		}                                                                 
+
+		// join thread
+		childProcess.thread.join();
+
+		// unregister the child
+		UserKernel.unregisterProcess(childProcessId);
+
+		// store exit status
+		byte temp[] = new byte[4];
+		temp = Lib.bytesFromInt(childProcess.exitStatus);
+		int cntBytes = writeVirtualMemory(status, temp);
+
+		if (cntBytes != 4) {
+			return 1;
+		} else {
+			return 0;
+		}
+	}
+
+	private int handleExec(int file, int argc, int argv) {
+		Lib.debug(dbgProcess, "handleExec()");
+		String Type = "[UserProcess][handleExec] ";
+
+		if (argc < 1) {                                                    
+			Lib.debug(dbgProcess, Type + "Error no arguments provided!");
+			return -1;                                                     
+		}                                                                  
+
+		String filename = readVirtualMemoryString(file, MAXSTRLEN);        
+		if (filename == null) {                                            
+			Lib.debug(dbgProcess, Type + "Error: filename not defined");
+			return -1;                                                     
+		}                                                                  
+
+		String fileType = filename.substring(filename.length() - 4, filename.length());
+		if (fileType.equals(".coff")) {                                      
+			Lib.debug(dbgProcess, Type + "Error: Invalid file extension, please provide .coff");
+			return -1;                                                     
+		}                                                                  
+
+		// get arguments
+		String args[] = new String[argc];
+		byte temp[] = new byte[4];
+
+		for (int i = 0; i < argc; i++) {                                   
+			int cntBytes = readVirtualMemory(argv + i * 4, temp);
+
+			if (cntBytes != 4) {                                           
+				return -1;                                                 
+			}                                                              
+
+			int argAddress = Lib.bytesToInt(temp, 0);                      
+			args[i] = readVirtualMemoryString(argAddress, MAXSTRLEN);      
+		}                                                                  
+
+		UserProcess childProcess = UserProcess.newUserProcess();
+		childProcess.ppid = this.pid;
+
+		this.children.add(childProcess.pid);
+		Lib.debug(dbgProcess, Type + "Created new child process with id " + childProcess.ppid);
+
+		// execute child process and create new thread
+		boolean retval = childProcess.execute(filename, args);             
+
+		if (retval) {                                                      
+			return childProcess.pid;                                       
+		} else {
+			return -1;                                                     
+		}
+	}
+
+	private int handleExit(int exitStatus) {
+
+	}
+
+	public int handleSyscall(int syscall, int a0, int a1, int a2, int a3) {
 	switch (syscall) {
 	case syscallHalt:
 	    return handleHalt();
-
+	case syscallExit:
+		return handleExit();
+	case syscallExec:
+		return handleExec(a0);
+	case syscallJoin:
+		return handleJoin(a0, a1);
 
 	default:
 	    Lib.debug(dbgProcess, "Unknown syscall " + syscall);
