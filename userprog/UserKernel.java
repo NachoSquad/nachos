@@ -1,5 +1,8 @@
 package nachos.userprog;
 
+import java.util.LinkedList;
+import java.util.List;
+
 import nachos.machine.*;
 import nachos.threads.*;
 import nachos.userprog.*;
@@ -27,6 +30,16 @@ public class UserKernel extends ThreadedKernel {
 	Machine.processor().setExceptionHandler(new Runnable() {
 		public void run() { exceptionHandler(); }
 	    });
+	
+	plock=new Lock();
+	freePages = new LinkedList<Integer>();
+	int j= Machine.processor().getNumPhysPages();
+	for (int i=0;i<j;i++)
+		freePages.add(i);
+	
+	
+	
+	
     }
 
     /**
@@ -106,6 +119,44 @@ public class UserKernel extends ThreadedKernel {
     public void terminate() {
 	super.terminate();
     }
+    
+    //Allocate fixed pages to a process
+    public  List<Integer> acquire(int pagesReq){
+    		pLock.acquire();
+    		boolean validReq =(pagesReq>0 && pagesReq<freePages.size());
+    		
+    		if (!validReq) {
+				pLock.release();
+				return null;
+			}
+    	
+    			List <Integer> pAllocated = new ArrayList<Integer>();
+    			for (int i=0;i<pagesReq;i++) {
+    				pAllocated.add(freePages.remove());
+    			}
+    			pLock.release();
+    			return pAllocated;
+    			
+    		
+    			
+    		
+    		
+    	
+    }
+    
+    // Release Pages belonging to a process
+    
+    public void release(List<Integer> usedPages) {
+    		pLock.acquire();
+    		for(Integer page: usedPages) {
+    			freePages.add(page);
+    		}
+    		pLock.release();
+    }
+    
+    
+    
+    
 
 	// return a number to free page
 	public static int getFreePage() {                              
@@ -166,11 +217,18 @@ public class UserKernel extends ThreadedKernel {
 
     /** Globally accessible reference to the synchronized console. */
     public static SynchConsole console;
+    
+    // Lock
+    
+    private Lock pLock;
+    
+    // Available Pages
+    
+    private LinkedList<Integer> freePages;
 
     // dummy variables to make javac smarter
     private static Coff dummy1 = null;
 
-	private static LinkedList<Integer> pageTable = new LinkedList<Integer>();              
 
 	// the next user id
 	private static int nextPid = 0;                                
