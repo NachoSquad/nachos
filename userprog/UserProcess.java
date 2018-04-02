@@ -181,14 +181,15 @@ public class UserProcess {
     	int vpn = (vaddr/pageSize);
     	int poffset = vaddr % pageSize;
     	int physMem = pageTable[vpn]*pageSize+offset;
+    	int writeBytes=data.length -offset;
     	byte [] machineMem= Machine.processor().getMemory();
     	boolean validAddress=((data.length>0) && (length>0) && (data.(length-offset)) && (!(length<data.length)) && (inVaddressSpace(vaddr)) && (inPhysAddressSpace(physMem)) && !(pageTable[vpn].readOnly) );
     	
     	if(validAddress) {
     	do {
-    		amountLeft=Math.min(writeBytes, Math.min(pageSize - pageOffset, length - numBytesWritten));
+    		amountLeft=Math.min(writeBytes, Math.min(pageSize - poffset, length - count));
     		soffSet=offset+count;
-    		doffset=pageTable[vpn].ppn*pageSize+offset;
+    		doffSet=(pageTable[vpn].ppn*pageSize)+offset;
     		System.arraycopy(data, soffSet, machineMem, doffSet, length);
     		    count += amountLeft;
              writeBytes -= count;
@@ -197,8 +198,7 @@ public class UserProcess {
              pageTable[vpn].used = true; 
              vpn++;
     	}while( (count < length) && (vpn <= pageTable.length) && (pageTable[vpn].valid)
-                && (!pageTable[vpn].readOnly) && inPhysAddressSpace(doffset)
-                && (writeBytes>0) );
+                && (!pageTable[vpn].readOnly) && (writeBytes>0) );
     	}	
     	return count;	
     	
