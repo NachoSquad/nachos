@@ -375,7 +375,7 @@ public class UserProcess {
      * Handle the halt() system call. 
      */
     private int handleHalt() {
-    if (this.process_id != ROOT){
+    if (this.process_id != 1){
     	return 0;
     }
 
@@ -483,7 +483,7 @@ public class UserProcess {
 			return -1;                                                     
 		}                                                                  
 
-		String filename = readVirtualMemoryString(file, MAXSTRLEN);        
+		String filename = readVirtualMemoryString(file, 256);
 		if (filename == null) {                                            
 			Lib.debug(dbgProcess, Type + "Error: filename not defined");
 			return -1;                                                     
@@ -507,7 +507,7 @@ public class UserProcess {
 			}                                                              
 
 			int argAddress = Lib.bytesToInt(temp, 0);                      
-			args[i] = readVirtualMemoryString(argAddress, MAXSTRLEN);      
+			args[i] = readVirtualMemoryString(argAddress, 256);
 		}                                                                  
 
 		UserProcess childProcess = UserProcess.newUserProcess();
@@ -538,10 +538,10 @@ public class UserProcess {
 		{
 			int childProcessID=children.removeFirst();
 			UserProcess childProcess = UserKernel.getProcessByID(childProcessId);
-			childProcess.ppid=ROOT;
+			childProcess.parentID = 1;
 			
 		}
-		this.exitStatus =exitStatus;
+		this.exitStatus = exitStatus;
 		Lib.debug(dbgProcess, "exitStates : " + exitStatus);
 		this.unloadSections();
 		if(this.processID == 0) {
