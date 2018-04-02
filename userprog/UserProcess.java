@@ -680,7 +680,7 @@ private int handleJoin(int childProcessId, int status) {
 
 	 
         // checks if its an invalid file
-        if (fhandle < 0 || fhandle >16                                  
+        if (fhandle < 0 || fhandle >16 || fds==null                                  
                 || fds[fhandle] == null) {                                                
             return -1;                                                    
         }                                                                 
