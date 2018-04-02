@@ -1,11 +1,16 @@
 package nachos.userprog;
 
 import java.util.LinkedList;
+
 import java.util.List;
 
 import nachos.machine.*;
 import nachos.threads.*;
 import nachos.userprog.*;
+
+import java.util.ArrayList;
+import java.util.HashMap;   
+
 
 /**
  * A kernel that can support multiple user processes.
@@ -23,23 +28,19 @@ public class UserKernel extends ThreadedKernel {
      * processor's exception handler.
      */
     public void initialize(String[] args) {
-	super.initialize(args);
+    	super.initialize(args);
 
-	console = new SynchConsole(Machine.console());
+    	console = new SynchConsole(Machine.console());
 	
-	Machine.processor().setExceptionHandler(new Runnable() {
-		public void run() { exceptionHandler(); }
+    	Machine.processor().setExceptionHandler(new Runnable() {
+    		public void run() { exceptionHandler(); }
 	    });
 	
-	plock=new Lock();
-	freePages = new LinkedList<Integer>();
-	int j= Machine.processor().getNumPhysPages();
-	for (int i=0;i<j;i++)
-		freePages.add(i);
-	
-	
-	
-	
+    	pLock=new Lock();
+    	freePages = new LinkedList<Integer>();
+    	int j= Machine.processor().getNumPhysPages();
+    	for (int i=0;i<j;i++)
+    		freePages.add(i);
     }
 
     /**
@@ -102,8 +103,35 @@ public class UserKernel extends ThreadedKernel {
      *
      * @see	nachos.machine.Machine#getShellProgramName
      */
+    
+    
+    /**
+     * Allocate pages when a process needs memory. Ensure no overlapping in memory.
+     */  
+    public List<Integer> malloc(int numPages) {
+	pLock.acquire();
+	
+	//make sure number of pages needed is a valid amount.
+	if (numPages <= 0 || numPages > freePages.size()) {
+        pLock.release();
+		return null;
+	}
+
+	List<Integer> toRet = new ArrayList<Integer>();
+
+	for(int i = 0; i < numPages; i++) {
+		toRet.add(freePages.remove());
+	}
+
+	pLock.release();
+
+	return toRet;
+    }	
+    
+    
     public void run() {
 	super.run();
+	
 
 	UserProcess process = UserProcess.newUserProcess();
 	
@@ -120,7 +148,7 @@ public class UserKernel extends ThreadedKernel {
 	super.terminate();
     }
     
-    //Allocate fixed pages to a process
+    /*Allocate fixed pages to a process
     public  List<Integer> acquire(int pagesReq){
     		pLock.acquire();
     		boolean validReq =(pagesReq>0 && pagesReq<freePages.size());
@@ -143,9 +171,9 @@ public class UserKernel extends ThreadedKernel {
     		
     	
     }
+    */
     
     // Release Pages belonging to a process
-    
     public void release(List<Integer> usedPages) {
     		pLock.acquire();
     		for(Integer page: usedPages) {
@@ -215,6 +243,7 @@ public class UserKernel extends ThreadedKernel {
 		return deletedProcess;                                      
 	}
 
+	public static final char dbgProcess = 'a';
     /** Globally accessible reference to the synchronized console. */
     public static SynchConsole console;
     

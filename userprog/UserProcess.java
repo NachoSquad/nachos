@@ -4,6 +4,8 @@ import nachos.machine.*;
 import nachos.threads.*;
 import nachos.userprog.*;
 
+import java.util.LinkedList; 
+import java.util.Iterator; 
 import java.io.EOFException;
 
 /**
@@ -424,53 +426,7 @@ public class UserProcess {
      * @param	a3	the fourth syscall argument.
      * @return	the value to be returned to the user.
      */
-	private int handleJoin(int childProcessId, int status) {
-		Lib.debug(dbgProcess, "handleJoin()");
-		String Type = "[UserProcess][handleJoin] ";
-
-		boolean flag = false;
-		int tmp = 0;                                                 
-		Iterator<int> it = this.children.iterator();
-
-		while(it.hasNext()) {                                             
-			tmp = it.next();                                         
-			if (tmp == childProcessId) {
-				it.remove();                                              
-				flag = true;
-				break;                                                    
-			}                                                             
-		}                                                                 
-
-		if (flag == false) {
-			Lib.debug(dbgProcess, Type + "Process" + this.pid + " does not have a child with id (" + childProcessId + ")");
-			return -1;                                                    
-		}                                                                 
-
-		// check if child has exited
-		UserProcess childProcess = UserKernel.getProcessByID(childProcessId);
-
-		if (childProcess == null) {
-			Lib.debug(dbgProcess, Type + "Child process " + childProcessId + " has already been joined!");
-			return -2;                                                    
-		}                                                                 
-
-		// join thread
-		childProcess.thread.join();
-
-		// unregister the child
-		UserKernel.unregisterProcess(childProcessId);
-
-		// store exit status
-		byte temp[] = new byte[4];
-		temp = Lib.bytesFromInt(childProcess.exitStatus);
-		int cntBytes = writeVirtualMemory(status, temp);
-
-		if (cntBytes != 4) {
-			return 1;
-		} else {
-			return 0;
-		}
-	}
+	
 
 	private int handleExec(int file, int argc, int argv) {
 		Lib.debug(dbgProcess, "handleExec()");
@@ -523,7 +479,54 @@ public class UserProcess {
 			return -1;                                                     
 		}
 	}
+	
+private int handleJoin(int childProcessId, int status) {
+		Lib.debug(dbgProcess, "handleJoin()");
+		String Type = "[UserProcess][handleJoin] ";
 
+		boolean flag = false;
+		int tmp = 0;                                                 
+		Iterator<int> it = this.children.iterator();
+
+		while(it.hasNext()) {                                             
+			tmp = it.next();                                         
+			if (tmp == childProcessId) {
+				it.remove();                                              
+				flag = true;
+				break;                                                    
+			}                                                             
+		}                                                                 
+
+		if (flag == false) {
+			Lib.debug(dbgProcess, Type + "Process" + this.pid + " does not have a child with id (" + childProcessId + ")");
+			return -1;                                                    
+		}                                                                 
+
+		// check if child has exited
+		UserProcess childProcess = UserKernel.getProcessByID(childProcessId);
+
+		if (childProcess == null) {
+			Lib.debug(dbgProcess, Type + "Child process " + childProcessId + " has already been joined!");
+			return -2;                                                    
+		}                                                                 
+
+		// join thread
+		childProcess.thread.join();
+
+		// unregister the child
+		UserKernel.unregisterProcess(childProcessId);
+
+		// store exit status
+		byte temp[] = new byte[4];
+		temp = Lib.bytesFromInt(childProcess.exitStatus);
+		int cntBytes = writeVirtualMemory(status, temp);
+
+		if (cntBytes != 4) {
+			return 1;
+		} else {
+			return 0;
+		}
+	}
 	private int handleExit(int exitStatus) {
 		Lib.debug(dbgProcess, "handleExit()");
 		String Type = "[UserProcess][handleExit] ";
@@ -559,7 +562,7 @@ public class UserProcess {
     	case syscallHalt:
     		return handleHalt();
     	case syscallCreate:
-    		return handleCreat(a0);
+    		return handleCreate(a0);
     	case syscallOpen: 
     		return handleOpen(a0);
     	case syscallRead:
@@ -604,7 +607,7 @@ public class UserProcess {
     	
     }
     
-    private int handleCreat(int a0) {
+    private int handleCreate(int a0) {
     	String filename = this.readVirtualMemoryString(a0,  255);
     	if (filename == null) {
     		return -1;
@@ -824,6 +827,11 @@ private FileDescriptor fds[] = new FileDescriptor[16];
     /** The number of pages in the program's stack. */
     protected final int stackPages = 8;
     
+    public static final int MAXSTRLEN = 256; 
+    
+    //pid of root prcocess 
+    public static final int ROOT = 1;   
+    
     private int initialPC, initialSP;
     private int argc, argv;
 	
@@ -832,12 +840,16 @@ private FileDescriptor fds[] = new FileDescriptor[16];
 
 	// process id
 	private int pid;
+	
+	//private process's ID
+	private int ppid;
 
 	// parent's process id
 	private int parentID;
 
 	// child processes
-	private LinkedList<int> children = new LinkedList<int>();
+	private LinkedList<Integer> children 
+						= new LinkedList<Integer>();
 
 	// exit status
 	private int exitStatus;
