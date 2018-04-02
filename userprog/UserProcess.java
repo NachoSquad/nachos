@@ -3,6 +3,7 @@ package nachos.userprog;
 import nachos.machine.*;
 import nachos.threads.*;
 import nachos.userprog.*;
+import java.util.LinkedList;
 
 import java.util.LinkedList; 
 import java.util.Iterator; 
@@ -375,7 +376,7 @@ public class UserProcess {
      * Handle the halt() system call. 
      */
     private int handleHalt() {
-    if (this.process_id != ROOT){
+    if (this.process_id != 1){
     	return 0;
     }
 
@@ -437,7 +438,7 @@ public class UserProcess {
 			return -1;                                                     
 		}                                                                  
 
-		String filename = readVirtualMemoryString(file, MAXSTRLEN);        
+		String filename = readVirtualMemoryString(file, 256);
 		if (filename == null) {                                            
 			Lib.debug(dbgProcess, Type + "Error: filename not defined");
 			return -1;                                                     
@@ -461,7 +462,7 @@ public class UserProcess {
 			}                                                              
 
 			int argAddress = Lib.bytesToInt(temp, 0);                      
-			args[i] = readVirtualMemoryString(argAddress, MAXSTRLEN);      
+			args[i] = readVirtualMemoryString(argAddress, 256);
 		}                                                                  
 
 		UserProcess childProcess = UserProcess.newUserProcess();
@@ -538,19 +539,16 @@ private int handleJoin(int childProcessId, int status) {
 		while(children != null && !children.isEmpty())
 		{
 			int childProcessID=children.removeFirst();
-			UserProcess childProcess = UserKernel.getProcessByID(childProcessId);
-			childProcess.ppid=ROOT;
+			UserProcess childProcess = UserKernel.getProcessByID(childProcessID);
+			childProcess.parentID = 1;
 			
 		}
-		this.exitStatus =exitStatus;
+		this.exitStatus = exitStatus;
 		Lib.debug(dbgProcess, "exitStates : " + exitStatus);
 		this.unloadSections();
-		if(processID == 0)
-		{
+		if(this.pid == 0) {
 			Kernel.kernel.terminate();
-		}
-		else
-		{
+		} else {
 			UThread.finish();
 		}
 		Lib.assertNotReached();
@@ -844,17 +842,21 @@ private FileDescriptor fds[] = new FileDescriptor[16];
 	//private process's ID
 	private int ppid;
 
+	//child process ID
+	private int childProcessID;
 	// parent's process id
 	private int parentID;
 
 	// child processes
+
 	private LinkedList<Integer> children 
 						= new LinkedList<Integer>();
 
+	private LinkedList<Integer> children = new LinkedList<Integer>();
+
+
 	// exit status
 	private int exitStatus;
-
-	
 
 	/* user thread that's associated with this process                  */
 	private UThread thread;                                       
