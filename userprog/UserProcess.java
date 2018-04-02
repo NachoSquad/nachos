@@ -566,6 +566,7 @@ private int handleJoin(int childProcessId, int status) {
 			UThread.finish();
 		}
 		Lib.assertNotReached();
+		return exitStatus;
 	}
 
     public int handleSyscall(int syscall, int a0, int a1, int a2, int a3) {
