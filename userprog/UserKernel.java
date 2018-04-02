@@ -230,7 +230,7 @@ public class UserKernel extends ThreadedKernel {
     private static Coff dummy1 = null;
 
 
-	// the next user id
+	// the next avaialble process id
 	private static int nextPid = 0;                                
 
 	// map of all processes

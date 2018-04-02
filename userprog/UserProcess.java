@@ -3,6 +3,8 @@ package nachos.userprog;
 import nachos.machine.*;
 import nachos.threads.*;
 import nachos.userprog.*;
+import java.util.LinkedList;
+import java.util.Iterator;
 
 import java.io.EOFException;
 
@@ -542,12 +544,9 @@ public class UserProcess {
 		this.exitStatus =exitStatus;
 		Lib.debug(dbgProcess, "exitStates : " + exitStatus);
 		this.unloadSections();
-		if(processID == 0)
-		{
+		if(this.processID == 0) {
 			Kernel.kernel.terminate();
-		}
-		else
-		{
+		} else {
 			UThread.finish();
 		}
 		Lib.assertNotReached();
@@ -837,12 +836,10 @@ private FileDescriptor fds[] = new FileDescriptor[16];
 	private int parentID;
 
 	// child processes
-	private LinkedList<int> children = new LinkedList<int>();
+	private LinkedList<Integer> children = new LinkedList<Integer>();
 
 	// exit status
 	private int exitStatus;
-
-	
 
 	/* user thread that's associated with this process                  */
 	private UThread thread;                                       
