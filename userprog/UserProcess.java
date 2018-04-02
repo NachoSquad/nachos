@@ -182,13 +182,13 @@ public class UserProcess {
     	int poffset = vaddr % pageSize;
     	int physMem = pageTable[vpn]*pageSize+offset;
     	byte [] machineMem= Machine.processor().getMemory();
-    	boolean validAddress=((data.length>0) && (length>0) && data.(length-offset) && (!(length<data.length)) && (inVaddressSpace(vaddr)) && inPhysAddressSpace(physMem) && !pageTable[vpn].readOnly );
+    	boolean validAddress=((data.length>0) && (length>0) && (data.(length-offset)) && (!(length<data.length)) && (inVaddressSpace(vaddr)) && (inPhysAddressSpace(physMem)) && !(pageTable[vpn].readOnly) );
     	
     	if(validAddress) {
     	do {
     		amountLeft=Math.min(writeBytes, Math.min(pageSize - pageOffset, length - numBytesWritten));
     		soffSet=offset+count;
-    		doffset=pageTable[vpn].ppn*pageSize)+offset;
+    		doffset=pageTable[vpn].ppn*pageSize+offset;
     		System.arraycopy(data, soffSet, machineMem, doffSet, length);
     		    count += amountLeft;
              writeBytes -= count;
