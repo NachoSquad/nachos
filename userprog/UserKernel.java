@@ -203,7 +203,7 @@ public class UserKernel extends ThreadedKernel {
 	public static void addFreePage(int pageNumber) {               
 		Lib.assertTrue(pageNumber >= 0 && pageNumber < Machine.processor().getNumPhysPages());
 		Machine.interrupt().disable();                               
-		pageTable.add(pageNumber);                                   
+		pageTable.add(pageNumber);
 		Machine.interrupt().enable();                                
 	}                                                               
 
@@ -258,6 +258,7 @@ public class UserKernel extends ThreadedKernel {
     // dummy variables to make javac smarter
     private static Coff dummy1 = null;
 
+	private static LinkedList<Integer> pageTable = new LinkedList<Integer>();
 
 	// the next avaialble process id
 	private static int nextPid = 0;                                

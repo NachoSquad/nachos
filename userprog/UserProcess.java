@@ -180,7 +180,7 @@ public class UserProcess {
     	int count,soffSet,doffSet,amountLeft=0;
     	int vpn = (vaddr/pageSize);
     	int poffset = vaddr % pageSize;
-    	int physMem = pageTable[vpn]*pageSize+offset;
+    	int physMem = this.pageTable[vpn]*pageSize+offset;
     	int writeBytes=data.length -offset;
     	byte [] machineMem= Machine.processor().getMemory();
     	boolean validAddress=((data.length>0) && (length>0) && (data.(length-offset)) && (!(length<data.length)) && (inVaddressSpace(vaddr)) && (inPhysAddressSpace(physMem)) && !(pageTable[vpn].readOnly) );
@@ -189,16 +189,16 @@ public class UserProcess {
     	do {
     		amountLeft=Math.min(writeBytes, Math.min(pageSize - poffset, length - count));
     		soffSet=offset+count;
-    		doffSet=(pageTable[vpn].ppn*pageSize)+offset;
+    		doffSet=(this.pageTable[vpn].ppn*pageSize)+offset;
     		System.arraycopy(data, soffSet, machineMem, doffSet, length);
     		    count += amountLeft;
              writeBytes -= count;
              poffset = 0;
-             pageTable[vpn].dirty = true; 
-             pageTable[vpn].used = true; 
+             this.pageTable[vpn].dirty = true;
+             this.pageTable[vpn].used = true;
              vpn++;
-    	}while( (count < length) && (vpn <= pageTable.length) && (pageTable[vpn].valid)
-                && (!pageTable[vpn].readOnly) && (writeBytes>0) );
+    	}while( (count < length) && (vpn <= this.pageTable.length) && (this.pageTable[vpn].valid)
+                && (!this.pageTable[vpn].readOnly) && (writeBytes>0) );
     	}	
     	return count;	
     	
@@ -390,7 +390,7 @@ public class UserProcess {
      * Handle the halt() system call. 
      */
     private int handleHalt() {
-    if (this.process_id != 1){
+    if (this.childProcessID != 1){
     	return 0;
     }
 
@@ -501,7 +501,7 @@ private int handleJoin(int childProcessId, int status) {
 
 		boolean flag = false;
 		int tmp = 0;                                                 
-		Iterator<int> it = this.children.iterator();
+		Iterator<Integer> it = this.children.iterator();
 
 		while(it.hasNext()) {                                             
 			tmp = it.next();                                         
@@ -602,22 +602,26 @@ private int handleJoin(int childProcessId, int status) {
 
    
     private int handleOpen(int a0) {
-    	String filename = this.readVirtualMemoryString(a0, 255);
-    	if (filename == null) {
-    		return -1;
-    	}
-    	
-    	OpenFile file = ThreadedKernel.filesystem.open(filename, false);
-    	if (file == null){
-    		return -1;
-    	}
-    	
-    	Integer filedescriptor = available_descriptors.remove(0);
-    	openfiles.put(filedescriptor, file);
-    	return filedescriptor;
-    	
-    	
-    }
+		String filename = this.readVirtualMemoryString(a0, 255);
+		if (filename == null) {
+			return -1;
+		}
+
+		OpenFile file = ThreadedKernel.fileSystem.open(filename, false);
+		if (file == null) {
+			return -1;
+		}
+
+		int fdIndex = getNextEmptyFileDescriptor();
+		if (fdIndex < 0) {
+			return -1;
+		} else {
+			fds[fdIndex].filename = filename;
+			fds[fdIndex].file = file;
+			fds[fdIndex].position = 0;
+			return fdIndex;
+		}
+	}
     
     private int handleCreate(int a0) {
     	String filename = this.readVirtualMemoryString(a0,  255);
@@ -629,15 +633,17 @@ private int handleJoin(int childProcessId, int status) {
     	if (file == null) {
     		return -1;
     	}
-    	
-		if (available_descriptors.size() < 1) {
-    		return -1;
-    	}
-		
-    	Integer filedescriptor = available_descriptors.remove(0);
-    	openfiles.put(filedescriptor, file);
-    	return filedescriptor;
-    }
+
+		int fdIndex = getNextEmptyFileDescriptor();
+		if (fdIndex < 0) {
+			return -1;
+		} else {
+			fds[fdIndex].filename = filename;
+			fds[fdIndex].file = file;
+			fds[fdIndex].position = 0;
+			return fdIndex;
+		}
+	}
     
     
     private int handleRead(int a0, int a1, int a2) {                      
@@ -810,17 +816,28 @@ private int handleJoin(int childProcessId, int status) {
         return -1;                                         
     }  
 
-public class FileDescriptor {                                 
-    public FileDescriptor() {                                
-    }                                                         
-    private  String   filename = "";   //  file name    
-    private  OpenFile file = null;     //file object  
-          
+	public class FileDescriptor {
+		public FileDescriptor() {
+		}
+		private  String   filename = "";   //  file name
+		private  OpenFile file = null;     //file object
+		private int position = 0; //  position
+		private  boolean  toRemove = false;
+		
 
-    private  boolean  toRemove = false;
-                                              
-}
-private FileDescriptor fds[] = new FileDescriptor[16];
+
+	}
+
+	public int getNextEmptyFileDescriptor() {
+		for (int i = 0; i < 16; i++) {
+			if (fds[i].file == null)
+				return i;
+		}
+
+		return -1;
+	}
+
+	private FileDescriptor fds[] = new FileDescriptor[16];
     /** The program being run by this process. */
     protected Coff coff;
 
@@ -858,9 +875,6 @@ private FileDescriptor fds[] = new FileDescriptor[16];
 
 	private LinkedList<Integer> children 
 						= new LinkedList<Integer>();
-
-	private LinkedList<Integer> children = new LinkedList<Integer>();
-
 
 	// exit status
 	private int exitStatus;
