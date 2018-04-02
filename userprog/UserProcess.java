@@ -646,7 +646,7 @@ private int handleJoin(int childProcessId, int status) {
         int vaddr = a1;                                
         int bufsize = a2;                                    
 
-        // get data about file descriptor
+        // checks if its a valid file
         if (handle < 0 || handle > 16|| fds[handle].file == null)                              
             return -1;                                                    
 
@@ -657,11 +657,9 @@ private int handleJoin(int childProcessId, int status) {
             return 0;                                                    
         }                                                                 
 
+        byte[] buf = new byte[bufsize];                                            
         FileDescriptor fd = fds[handle];                                 
-        byte[] buf = new byte[bufsize];                                   
-
-        // invoke read through classOpenFileWithPosition                        
-        //rather than class StubFileSystem                                     
+                                              
         int rnum = fd.file.read(buf, 0, bufsize);                      
 
         if (rnum < 0) {                                                
@@ -672,22 +670,20 @@ private int handleJoin(int childProcessId, int status) {
             if (wnum < 0) {                                           
                 return -1;                                                
             }                                                             
-            else {                                                        
-            //fd.position = fd.position + writenum;                         
+            else {                                                                           
                return wnum;                                           
             }                                                             
         }                                                                 
     }    
     private int handleWrite(int a0, int a1, int a2) {
-	    Lib.debug(dbgProcess, "handleWrite()");                           
-         
-        int fhandle = a0;                 //a0 is file descriptor handle 
-        int bufadd = a1;                  // a1 is buf address            
-        int bufsize = a2;                // a2 is buf size               
+	
+        int fhandle = a0;                 
+        int bufadd = a1;                            
+        int bufsize = a2;                           
         int retval;                                                         
 
 	 
-        // if its an invalid file
+        // checks if its an invalid file
         if (fhandle < 0 || fhandle >16                                  
                 || fds[fhandle].file == null) {                                                
             return -1;                                                    
@@ -711,15 +707,14 @@ private int handleJoin(int childProcessId, int status) {
             return -1;                                                    
         }                                                                 
 
-        // invoke write through stubFilesystem                            
+                        
         retval = fd.file.write(buf, 0, bytesRead);                        
         
         if (retval < 0) {                                                 
             return -1;                                                    
         }                                                                 
         else {                                                            
-            // classOpenFileWithPostion will maintain a position                
-            // fd.position = fd.position + retval;                        
+                                
             return retval;                                               
             }                                                              
     }
@@ -733,8 +728,7 @@ private int handleJoin(int childProcessId, int status) {
         boolean retval = true;                                           
 
         FileDescriptor fd = fds[handle];                                  
-
-        //fd.position = 0;                                                 
+                                            
         fd.file.close();                                                  
         fd.file = null;                                                   
 
@@ -758,7 +752,6 @@ private int handleJoin(int childProcessId, int status) {
         String filename = readVirtualMemoryString(a0, 256);        
 
 	             
-
         int fileHandle = findFileDescriptorByName(filename);             
         if (fileHandle < 0) {                                            
          //if its not being used remove it from filesystem
@@ -820,12 +813,12 @@ private int handleJoin(int childProcessId, int status) {
 public class FileDescriptor {                                 
     public FileDescriptor() {                                
     }                                                         
-    private  String   filename = "";   // opened file name    
-    private  OpenFile file = null;     // opened file object  
-    //private  int      position = 0;  // IO position           
+    private  String   filename = "";   //  file name    
+    private  OpenFile file = null;     //file object  
+          
 
-    private  boolean  toRemove = false;// if need to remove   
-                                       // this file           
+    private  boolean  toRemove = false;
+                                              
 }
 private FileDescriptor fds[] = new FileDescriptor[16];
     /** The program being run by this process. */
