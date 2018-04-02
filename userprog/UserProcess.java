@@ -176,18 +176,32 @@ public class UserProcess {
      */
     public int writeVirtualMemory(int vaddr, byte[] data, int offset,
 				  int length) {
-	Lib.assertTrue(offset >= 0 && length >= 0 && offset+length <= data.length);
-
-	byte[] memory = Machine.processor().getMemory();
-	
-	// for now, just assume that virtual addresses equal physical addresses
-	if (vaddr < 0 || vaddr >= memory.length)
-	    return 0;
-
-	int amount = Math.min(length, memory.length-vaddr);
-	System.arraycopy(data, offset, memory, vaddr, amount);
-
-	return amount;
+    	
+    	int count,soffSet,doffSet,amountLeft=0;
+    	int vpn = (vaddr/pageSize);
+    	int poffset = vaddr % pageSize;
+    	int physMem = pageTable[vpn]*pageSize+offset;
+    	byte [] machineMem= Machine.processor().getMemory();
+    	boolean validAddress=((data.length>0) && (length>0) && data.(length-offset) && (!(length<data.length)) && (inVaddressSpace(vaddr)) && inPhysAddressSpace(physMem) && !pageTable[vpn].readOnly );
+    	
+    	if(validAddress) {
+    	do {
+    		amountLeft=Math.min(writeBytes, Math.min(pageSize - pageOffset, length - numBytesWritten));
+    		soffSet=offset+count;
+    		doffset=pageTable[vpn].ppn*pageSize)+offset;
+    		System.arraycopy(data, soffSet, machineMem, doffSet, length);
+    		    count += amountLeft;
+             writeBytes -= count;
+             poffset = 0;
+             pageTable[vpn].dirty = true; 
+             pageTable[vpn].used = true; 
+             vpn++;
+    	}while( (count < length) && (vpn <= pageTable.length) && (pageTable[vpn].valid)
+                && (!pageTable[vpn].readOnly) && inPhysAddressSpace(doffset)
+                && (writeBytes>0) );
+    	}	
+    	return count;	
+    	
     }
     
     
