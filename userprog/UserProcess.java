@@ -1,11 +1,15 @@
+// nachosquad
+
 package nachos.userprog;
+
+import java.io.EOFException;
+import java.util.*;
 
 import nachos.machine.*;
 import nachos.threads.*;
 import nachos.userprog.*;
 
-import java.io.EOFException;
-import java.util.*;
+
 
 /**
  * Encapsulates the state of a user process that is not contained in its
@@ -24,25 +28,29 @@ public class UserProcess {
 	 * Allocate a new process.
 	 */
 	public UserProcess() {
+		boolean status = Machine.interrupt().disable();
 		fileDescriptorTable = new OpenFile[16];
-		boolean intStatus = Machine.interrupt().disable();
+
 		processID = processIdCounter;
 		processIdCounter++;
+
+		// do this to fill up the first fild descriptors
 		if (parentProcess == null){
 			stdin = UserKernel.console.openForReading();
 			stdout = UserKernel.console.openForWriting();
-		}else{
+		} else {
 			stdin = parentProcess.stdin;
 			stdout = parentProcess.stdout;
 		}
-		Machine.interrupt().restore(intStatus);
+		Machine.interrupt().restore(status);
+		fileDescriptorTable[0] = stdin;
+		fileDescriptorTable[1] = stdout;
 
-		fileDescriptorTable[0] = stdin; //stdin
-		fileDescriptorTable[1] = stdout; //stdout
-		childProcesses = new LinkedList<UserProcess>();
 		parentProcess = null;
-		exitStatusList = new HashMap<Integer,Integer>();
 		mapLock = new Lock();
+
+		childProcesses = new LinkedList<UserProcess>();
+		exitStatusList = new HashMap<Integer,Integer>();
 	}
 
 	/**
