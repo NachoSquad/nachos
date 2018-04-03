@@ -607,21 +607,22 @@ private int handleJoin(int childProcessId, int status) {
 
 		// join thread
 		childProcess.thread.join();
-		Lib.debug(dbgProcess, Type + "Break 1");
-		// unregister the child
-		UserKernel.unregisterProcess(childProcessId);
-		Lib.debug(dbgProcess, Type + "Break 2");
-		// store exit status
-		byte temp[] = new byte[4];
-		temp = Lib.bytesFromInt(childProcess.exitStatus);
-		int cntBytes = writeVirtualMemory(status, temp);
-		Lib.debug(dbgProcess, Type + "Break 3");
-		if (cntBytes != 4) {
-			return 1;
-		}
 
-		Lib.debug(dbgProcess, Type + "Break 4");
 		return 0;
+
+		// unregister the child
+//		UserKernel.unregisterProcess(childProcessId);
+//
+//		// store exit status
+//		byte temp[] = new byte[4];
+//		temp = Lib.bytesFromInt(childProcess.exitStatus);
+//		int cntBytes = writeVirtualMemory(status, temp);
+//
+//		if (cntBytes != 4) {
+//			return 1;
+//		}
+//
+//		return 0;
 	}
 	private int handleExit(int exitStatus) {
 		Lib.debug(dbgProcess, "handleExit()");
