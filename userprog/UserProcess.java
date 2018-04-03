@@ -37,6 +37,23 @@ public class UserProcess {
 		fds[j] = new FileDescriptor(); 
 	}
 	
+	
+	if(parentProcess == null) {
+		stdin = UserKernel.console.openForReading(); 
+		stdout = UserKernel.console.openForWriting(); 
+	} else {
+		stdin = parentProcess.stdin; 
+		stdout = parentProcess.stdout; 
+	}
+	parentProcess = null; 
+	
+	childProcesses = new LinkedList<UserProcess>(); 
+	
+	fileDescriptorTable = new OpenFile[16]; 
+	fileDescriptorTable[0] = stdin; 
+	fileDescriptorTable[1] = stdout; 
+	
+	
     }
     
     /**
@@ -100,6 +117,7 @@ public class UserProcess {
     	Lib.assertTrue(maxLength >= 0);
 
     	byte[] bytes = new byte[maxLength+1];
+    	
 
     	int bytesRead = readVirtualMemory(vaddr, bytes);
 
@@ -682,43 +700,40 @@ private int handleJoin(int childProcessId, int status) {
         int fhandle = a0;                 
         int bufadd = a1;                            
         int bufsize = a2;                           
-        int retval;                                                         
+        int bytesCount = 0; 
+        int returnValue = 0; 
 
 	 
         // checks if its an invalid file
-        if (fhandle < 0 || fhandle >16 || fds==null                                  
-                || fds[fhandle] == null) {                                                
+        if (fhandle < 0 || fhandle > 15 ) {                                                
             return -1;                                                    
-        }                                                                 
-
-        FileDescriptor fd = fds[fhandle];                                  
-
-        if (bufsize < 0) {                                                              
-            return  -1;                                                   
-        }                                                                 
-        else if (bufsize == 0) {                                                                   
-            return 0;                                                     
-        }                                                                 
-
-
-        byte[] buf = new byte[bufsize];                                     
-
-        int bytesRead = readVirtualMemory(bufadd, buf);                       
-
-        if (bytesRead < 0) {                                              
-            return -1;                                                    
-        }                                                                 
-
-                        
-        retval = fd.file.write(buf, 0, bytesRead);                        
+        }     
         
-        if (retval < 0) {                                                 
-            return -1;                                                    
-        }                                                                 
-        else {                                                            
-                                
-            return retval;                                               
-            }                                                              
+        //obtain the file 
+        OpenFile file = fileDescriptorTable[fhandle]; 
+        
+        //file descriptor returns null file 
+        if(file == null) { return -1; } 
+        
+        
+        if(bufsize < 0) { return -1; } 
+        
+        
+        //read from this buffer 
+        byte[] buffer = new byte[bufsize]; 
+        
+        //virtual address space -> buffer 
+        bytesCount = readVirtualMemory(bufadd,buffer,0,bufsize); 
+        
+        //buffer -> file 
+        returnValue = file.write(buffer, 0, bytesCount); 
+        
+        if(returnValue != bufsize) {
+        		return -1; 
+        }
+        
+        return returnValue; 
+                                                                                                            
     }
 
     private int handleClose(int a0) {                                    
@@ -876,5 +891,12 @@ private int handleJoin(int childProcessId, int status) {
 	private int exitStatus;
 
 	/* user thread that's associated with this process                  */
-	private UThread thread;                                       
+	private UThread thread;   
+	
+	private OpenFile[] fileDescriptorTable;
+	private LinkedList<UserProcess> childProcesses;
+	private UserProcess parentProcess;
+	protected OpenFile stdin;
+	protected OpenFile stdout;
+	
 }
