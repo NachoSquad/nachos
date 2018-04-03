@@ -579,24 +579,6 @@ private int handleJoin(int childProcessId, int status) {
 		Lib.debug(dbgProcess, "handleJoin()");
 		String Type = "[UserProcess][handleJoin] ";
 
-		boolean flag = false;
-		int tmp = 0;                                                 
-		Iterator<Integer> it = this.children.iterator();
-
-		while(it.hasNext()) {                                             
-			tmp = it.next();                                         
-			if (tmp == childProcessId) {
-				it.remove();                                              
-				flag = true;
-				break;                                                    
-			}                                                             
-		}                                                                 
-
-		if (flag == false) {
-			Lib.debug(dbgProcess, Type + "Process" + this.pid + " does not have a child with id (" + childProcessId + ")");
-			return -1;                                                    
-		}                                                                 
-
 		// check if child has exited
 		UserProcess childProcess = UserKernel.getProcessByID(childProcessId);
 
@@ -608,21 +590,19 @@ private int handleJoin(int childProcessId, int status) {
 		// join thread
 		childProcess.thread.join();
 
-		return 0;
-
 		// unregister the child
-//		UserKernel.unregisterProcess(childProcessId);
-//
-//		// store exit status
-//		byte temp[] = new byte[4];
-//		temp = Lib.bytesFromInt(childProcess.exitStatus);
-//		int cntBytes = writeVirtualMemory(status, temp);
-//
-//		if (cntBytes != 4) {
-//			return 1;
-//		}
-//
-//		return 0;
+		UserKernel.unregisterProcess(childProcessId);
+
+		// store exit status
+		byte temp[] = new byte[4];
+		temp = Lib.bytesFromInt(childProcess.exitStatus);
+		int cntBytes = writeVirtualMemory(status, temp);
+
+		if (cntBytes != 4) {
+			return 1;
+		}
+
+		return 0;
 	}
 	private int handleExit(int exitStatus) {
 		Lib.debug(dbgProcess, "handleExit()");
