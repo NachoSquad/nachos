@@ -159,16 +159,59 @@ public class UserProcess {
 				 int length) {
     	Lib.assertTrue(offset >= 0 && length >= 0 && offset+length <= data.length);
 
-    	byte[] memory = Machine.processor().getMemory();
-	
-    	// for now, just assume that virtual addresses equal physical addresses
-    	if (vaddr < 0 || vaddr >= memory.length)
-    		return 0;
+		//make sure that virtual address is valid for this process' virtual address space
+		if (vaddr < 0)
+			vaddr = 0;
+		Machine.processor();
+		if (length > Processor.makeAddress(numPages-1, pageSize-1) - vaddr) {
+			Machine.processor();
+			length = Processor.makeAddress(numPages-1, pageSize-1) - vaddr;
+		}
 
-    	int amount = Math.min(length, memory.length-vaddr);
-    	System.arraycopy(memory, vaddr, data, offset, amount);
+		byte[] memory = Machine.processor().getMemory();
 
-    	return amount;
+		Machine.processor();
+		int firstvirtualpage = Processor.pageFromAddress(vaddr);
+		Machine.processor();
+		int endvirtualpage = Processor.pageFromAddress(vaddr+length);
+		int transferredBytes = 0;
+		for (int i=firstvirtualpage; i<=endvirtualpage; i++){
+			if (!pageTable[i].valid)
+				break; //stop reading, return numBytesTransferred for whatever we've written so far
+			Machine.processor();
+			int firstvirtualaddress = Processor.makeAddress(i, 0);
+			Machine.processor();
+			int endvirtualaddress = Processor.makeAddress(i, pageSize-1);
+			int offset1;
+			int offset2;
+			//virtual page is in the middle, copy entire page (most common case)
+			if (vaddr <= firstvirtualaddress && vaddr+length >= endvirtualaddress){
+				offset1 = 0;
+				offset2 = pageSize - 1;
+			}
+			//virtual page is first to be transferred
+			else if (vaddr > firstvirtualaddress && vaddr+length >= endvirtualaddress){
+				offset1 = vaddr - firstvirtualaddress;
+				offset2 = pageSize - 1;
+			}
+			//virtual page is last to be transferred
+			else if (vaddr <= firstvirtualaddress && vaddr+length < endvirtualaddress){
+				offset1 = 0;
+				offset2 = (vaddr + length) - firstvirtualaddress;
+			}
+			//only need inner chunk of a virtual page (special case)
+			else { //(vaddr > firstVirtAddress && vaddr+length < lastVirtAddress)
+				offset1 = vaddr - firstvirtualaddress;
+				offset2 = (vaddr + length) - firstvirtualaddress;
+			}
+			Machine.processor();
+			int firstphysicaladdress = Processor.makeAddress(pageTable[i].ppn, offset1);
+			//int lastPhysAddress = Machine.processor().makeAddress(pageTable[i].ppn, offset2);
+			System.arraycopy(memory, firstphysicaladdress, data, offset+transferredBytes, offset2-offset1);
+			transferredBytes += (offset2-offset1);
+			pageTable[i].used = true;
+		}		
+		return transferredBytes;
     }
 
     /**
@@ -201,45 +244,66 @@ public class UserProcess {
     public int writeVirtualMemory(int vaddr, byte[] data, int offset,
 				  int length) {
 
-		Lib.assertTrue(offset >= 0 && length >= 0 && offset+length <= data.length);
-
-		Processor processor = Machine.processor();                  
+		Lib.assertTrue(offset >= 0 && length >= 0 && offset+length <= data.length);               
 		byte[] memory = Machine.processor().getMemory();
 		
-		int vpn = processor.pageFromAddress(vaddr);
-		int addressOffset = processor.offsetFromAddress(vaddr);     
-
-		TranslationEntry entry = null;                              
-		entry = pageTable[vpn];                                     
-		entry.used = true;                                          
-		entry.dirty = true;                                         
-
-		int ppn = entry.ppn;                                        
-		int paddr = (ppn*pageSize) + addressOffset;                 
-
-		if (entry.readOnly) {                                       
-			return 0;
-		}                                                           
-
-		if (ppn < 0 || ppn >= processor.getNumPhysPages())  {
-			return 0;
-		}                                                           
-
-		int amount = Math.min(length, memory.length-vaddr);
-		System.arraycopy(data, offset, memory, vaddr, amount);
-
-		return amount;
+		// check that virtual address is valid for this process 
+		if(vaddr < 0) {
+			vaddr = 0; 
+		}
+		if(length > Machine.processor().makeAddress(numPages-1, pageSize-1)-vaddr) {
+			length = Machine.processor().makeAddress(numPages-1, pageSize-1) - vaddr; 
+		}
+		
+		int firstvirtualpage = Machine.processor().pageFromAddress(vaddr); 
+		int endvirtualpage = Machine.processor().pageFromAddress(vaddr+length); 
+		int transferredBytes = 0; 
+		
+		for(int i = firstvirtualpage; i <= endvirtualpage; i++) {
+			if(!pageTable[i].valid || pageTable[i].readOnly) {
+				break; //stop writing to memory . return current amount of transferred bytes
+			}
+			Machine.processor();
+			int firstvirtualaddress = Processor.makeAddress(i, 0); 
+			Machine.processor();
+			int lastvirtualaddress = Processor.makeAddress(i, pageSize-1); 
+			int offset1; 
+			int offset2; 
+			
+			//neither the first virtual page or the last virtual page 
+			if(vaddr <= firstvirtualaddress && vaddr+length >= lastvirtualaddress) {
+				offset1 = 0; 
+				offset2 = pageSize - 1; 
+			} 
+			// the first virtual page 
+			else if (vaddr > firstvirtualaddress && vaddr+length >= lastvirtualaddress) {
+				offset1 = vaddr - firstvirtualaddress; 
+				offset2 = pageSize - 1; 
+			}
+			// the last virtual page 
+			else if(vaddr <= firstvirtualaddress && vaddr+length < lastvirtualaddress) {
+				offset1 = 0; 
+				offset2 = (vaddr + length) - firstvirtualaddress; 
+			}
+			//(special case) part of a virtual page 
+			else {
+				offset1 = vaddr - firstvirtualaddress; 
+				offset2 = (vaddr + length) - firstvirtualaddress; 
+			}
+			Machine.processor();
+			int firstphysicaladdress = Processor.makeAddress(pageTable[i].ppn, offset1); 
+			System.arraycopy(data, offset+transferredBytes, memory, firstphysicaladdress, offset2-offset1);
+			transferredBytes += (offset2-offset1); 
+			pageTable[i].used = true; 
+			pageTable[i].dirty = true; 
+		}
+		return transferredBytes; 
     	
     }
     
     
     
-    
-    
-    
-    
-    
-
+ 
     /**
      * Load the executable with the specified name into this process, and
      * prepare to pass it the specified arguments. Opens the executable, reads
@@ -454,56 +518,61 @@ public class UserProcess {
      */
 	
 
-	private int handleExec(int file, int argc, int argv) {
-		Lib.debug(dbgProcess, "handleExec()");
-		String Type = "[UserProcess][handleExec] ";
-
-		if (argc < 1) {                                                    
-			Lib.debug(dbgProcess, Type + "Error no arguments provided!");
-			return -1;                                                     
-		}                                                                  
-
-		String filename = readVirtualMemoryString(file, 256);
-		if (filename == null) {                                            
-			Lib.debug(dbgProcess, Type + "Error: filename not defined");
-			return -1;                                                     
-		}                                                                  
-
-		String fileType = filename.substring(filename.length() - 4, filename.length());
-		if (fileType.equals(".coff")) {                                      
-			Lib.debug(dbgProcess, Type + "Error: Invalid file extension, please provide .coff");
-			return -1;                                                     
-		}                                                                  
-
-		// get arguments
-		String args[] = new String[argc];
-		byte temp[] = new byte[4];
-
-		for (int i = 0; i < argc; i++) {                                   
-			int cntBytes = readVirtualMemory(argv + i * 4, temp);
-
-			if (cntBytes != 4) {                                           
-				return -1;                                                 
-			}                                                              
-
-			int argAddress = Lib.bytesToInt(temp, 0);                      
-			args[i] = readVirtualMemoryString(argAddress, 256);
-		}                                                                  
-
-		UserProcess childProcess = UserProcess.newUserProcess();
-		childProcess.parentID = this.pid;
-
-		this.children.add(childProcess.pid);
-		Lib.debug(dbgProcess, Type + "Created new child process with id " + childProcess.parentID);
-
-		// execute child process and create new thread
-		boolean retval = childProcess.execute(filename, args);             
-
-		if (retval) {                                                      
-			return childProcess.pid;
-		} else {
-			return -1;                                                     
+	private int handleExec(int filevaddr, int argc, int argv) {
+		
+		if(filevaddr < 0) {
+			Lib.debug(dbgProcess, "File virtual address error");
+			return -1; 
 		}
+		
+		String filename = readVirtualMemoryString(filevaddr,256); 
+		if(filename == null) {
+			Lib.debug(dbgProcess, "Filename error");
+			return -1; 
+		}
+		String[] filenameArray = filename.split("\\."); 
+		String last = filenameArray[filenameArray.length -1]; 
+		
+		if(!last.toLowerCase().equals("coff")) {
+			Lib.debug(dbgProcess, "File name must end with 'coff' ");
+			return -1; 
+		}
+		
+		if(argc < 0) {
+			Lib.debug(dbgProcess, "Enter a positve number of arguments");
+			return -1; 
+		}
+		
+		String[] arguments = new String[argc]; 
+		for(int i = 0; i < argc; i++) {
+			byte[] pointer = new byte[4]; 
+			int byteRead = readVirtualMemory(argv + (i*4),pointer); 
+			
+			//check the pointer 
+			if(byteRead != 4) {
+				Lib.debug(dbgProcess, "Pointer error" );
+				return -1; 
+			}
+			int argvaddr = Lib.bytesToInt(pointer, 0); 
+			String argument = readVirtualMemoryString(argvaddr,256); 
+			
+			if(argument == null) {
+				Lib.debug(dbgProcess, "Argument not read");
+				return -1; 
+			}
+			
+			arguments[i] = argument; 
+		}
+		
+		UserProcess child = UserProcess.newUserProcess(); 
+		if(child.execute(filename, arguments)) {
+			this.childProcesses.add(child); 
+			child.parentProcess = this; 
+			return child.childProcessID;		
+		}else {
+			Lib.debug(dbgProcess, "Failed to execute");
+			return -1; 
+		}	
 	}
 	
 private int handleJoin(int childProcessId, int status) {
