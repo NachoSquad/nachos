@@ -685,84 +685,99 @@ private int handleJoin(int childProcessId, int status) {
 
    
     private int handleOpen(int a0) {
-		String filename = this.readVirtualMemoryString(a0, 255);
-		if (filename == null) {
-			return -1;
-		}
+    	        // Check name
+    			if (a0 < 0){
+    				Lib.debug(dbgProcess, "Invalid virtual address");
+    				return -1;
+    			}
+    			String filename = readVirtualMemoryString(a0, 256);
+    			if (filename == null){
+    				Lib.debug(dbgProcess, "Illegal Filename");
+    				return -1;
+    			}
 
-		OpenFile file = ThreadedKernel.fileSystem.open(filename, false);
-		if (file == null) {
-			return -1;
-		}
+    			// check for free fileDescriptor
+    			int emptyIndex = -1;
+    			for(int i=2; i<16; i++){
+    				if(fileDescriptorTable[i] == null){
+    					emptyIndex = i;
+    					break;
+    				}
+    			}
+    			if (emptyIndex == -1){
+    				Lib.debug(dbgProcess, "No free fileDescriptor available");
+    				return -1;
+    			}
 
-		int fdIndex = getNextEmptyFileDescriptor();
-		if (fdIndex < 0) {
-			return -1;
-		} else {
-			fds[fdIndex].filename = filename;
-			fds[fdIndex].file = file;
-			fds[fdIndex].position = 0;
-			return fdIndex;
-		}
+    			OpenFile file = ThreadedKernel.fileSystem.open(filename, false);
+    			if (file == null){
+    				Lib.debug(dbgProcess, "Cannot create file");
+    				return -1;
+    			}else{
+    				fileDescriptorTable[emptyIndex] = file;
+    				return emptyIndex;
+    			}
 	}
     
     private int handleCreate(int a0) {
-    	String filename = this.readVirtualMemoryString(a0,  255);
-    	if (filename == null) {
-    		return -1;
-    	}
-    	
-    	OpenFile file = ThreadedKernel.fileSystem.open(filename, true);
-    	if (file == null) {
-    		return -1;
-    	}
+    			// Check name
+    			if (a0 < 0){
+    				Lib.debug(dbgProcess, "Invalid virtual address");
+    				return -1;
+    			}
+    			String filename = readVirtualMemoryString(a0, 256);
+    			if (filename == null){
+    				Lib.debug(dbgProcess, "Illegal Filename");
+    				return -1;
+    			}
 
-		int fdIndex = getNextEmptyFileDescriptor();
-		if (fdIndex < 0) {
-			return -1;
-		} else {
-			fds[fdIndex].filename = filename;
-			fds[fdIndex].file = file;
-			fds[fdIndex].position = 0;
-			return fdIndex;
-		}
+    			// check for free fileDescriptor
+    			int emptyIndex = -1;
+    			for(int i=2; i<16; i++){
+    				if(fileDescriptorTable[i] == null){
+    					emptyIndex = i;
+    					break;
+    				}
+    			}
+    			if (emptyIndex == -1){
+    				Lib.debug(dbgProcess, "No free fileDescriptor available");
+    				return -1;
+    			}
+
+    			OpenFile file = ThreadedKernel.fileSystem.open(filename, true);
+    			if (file == null){
+    				Lib.debug(dbgProcess, "Cannot create file");
+    				return -1;
+    			}else{
+    				fileDescriptorTable[emptyIndex] = file;
+    				return emptyIndex;
+    			}
 	}
     
     
     private int handleRead(int a0, int a1, int a2) {                      
+	   int byteCount = 0;
+	   int returnValue = 0; 
 	   
-        int handle = a0;                    
-        int vaddr = a1;                                
-        int bufsize = a2;                                    
-
-        // checks if its a valid file
-        if (handle < 0 || handle > 16|| fds[handle].file == null)                              
-            return -1;                                                    
-
-        if (bufsize < 0) {                                                          
-            return  -1;                                                   
-        }                                                                
-        else if (bufsize == 0) {                                                               
-            return 0;                                                    
-        }                                                                 
-
-        byte[] buf = new byte[bufsize];                                            
-        FileDescriptor fd = fds[handle];                                 
-                                              
-        int rnum = fd.file.read(buf, 0, bufsize);                      
-
-        if (rnum < 0) {                                                
-            return -1;                                                    
-        }                                                                 
-        else {                                                            
-            int wnum = writeVirtualMemory(vaddr, buf, 0, rnum);    
-            if (wnum < 0) {                                           
-                return -1;                                                
-            }                                                             
-            else {                                                                           
-               return wnum;                                           
-            }                                                             
-        }                                                                 
+	   //exception 
+	   if(a0 < 0 || a0 > 15) {return -1;} 
+	   
+	   OpenFile file = fileDescriptorTable[a0]; 
+	   
+	   if(file == null) {return -1;} 
+	   
+	   if(a2 < 0) {return -1;} 
+	   
+	   byte[] buffer = new byte[a2]; 
+	   
+	   byteCount = file.read(buffer, 0, a2); 
+	   
+	   if(byteCount == -1) {return -1;} 
+	   
+	   returnValue = writeVirtualMemory(a1,buffer,0,byteCount); 
+	   
+	   return returnValue; 
+	                                                      
     }    
     private int handleWrite(int a0, int a1, int a2) {
 	
