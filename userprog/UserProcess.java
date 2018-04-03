@@ -152,50 +152,46 @@ public class UserProcess {
 	 *			the array.
 	 * @return	the number of bytes successfully transferred.
 	 */
-	public int readVirtualMemory(int vaddr, byte[] data, int offset,
-								 int length) {
+	public int readVirtualMemory(int vaddr, byte[] data, int offset, int length) {
 		Lib.assertTrue(offset >= 0 && length >= 0 && offset+length <= data.length);
-
-		//make sure that virtual address is valid for this process' virtual address space
-		if (vaddr < 0)
+		if (vaddr < 0) {
 			vaddr = 0;
-		if (length > Machine.processor().makeAddress(numPages-1, pageSize-1) - vaddr)
-			length = Machine.processor().makeAddress(numPages-1, pageSize-1) - vaddr;
+		}
+		if (length > Machine.processor().makeAddress(numPages-1, pageSize-1) - vaddr) {
+			length = Machine.processor().makeAddress(numPages - 1, pageSize - 1) - vaddr;
+		}
 
 		byte[] memory = Machine.processor().getMemory();
 
 		int firstVirtPage = Machine.processor().pageFromAddress(vaddr);
-		int lastVirtPage = Machine.processor().pageFromAddress(vaddr+length);
+		int vadx = vaddr + length;
+		int lastVirtPage = Machine.processor().pageFromAddress(vadx);
 		int numBytesTransferred = 0;
 		for (int i=firstVirtPage; i<=lastVirtPage; i++){
-			if (!pageTable[i].valid)
-				break; //stop reading, return numBytesTransferred for whatever we've written so far
+			if (!pageTable[i].valid) {
+				break;
+			}
+
 			int firstVirtAddress = Machine.processor().makeAddress(i, 0);
 			int lastVirtAddress = Machine.processor().makeAddress(i, pageSize-1);
 			int offset1;
 			int offset2;
-			//virtual page is in the middle, copy entire page (most common case)
-			if (vaddr <= firstVirtAddress && vaddr+length >= lastVirtAddress){
+
+			if (vaddr <= firstVirtAddress && vadx >= lastVirtAddress){
 				offset1 = 0;
 				offset2 = pageSize - 1;
-			}
-			//virtual page is first to be transferred
-			else if (vaddr > firstVirtAddress && vaddr+length >= lastVirtAddress){
+			} else if (vaddr > firstVirtAddress && vadx >= lastVirtAddress){
 				offset1 = vaddr - firstVirtAddress;
 				offset2 = pageSize - 1;
-			}
-			//virtual page is last to be transferred
-			else if (vaddr <= firstVirtAddress && vaddr+length < lastVirtAddress){
+			} else if (vaddr <= firstVirtAddress && vadx < lastVirtAddress){
 				offset1 = 0;
-				offset2 = (vaddr + length) - firstVirtAddress;
-			}
-			//only need inner chunk of a virtual page (special case)
-			else { //(vaddr > firstVirtAddress && vaddr+length < lastVirtAddress)
+				offset2 = (vadx) - firstVirtAddress;
+			} else {
 				offset1 = vaddr - firstVirtAddress;
-				offset2 = (vaddr + length) - firstVirtAddress;
+				offset2 = (vadx) - firstVirtAddress;
 			}
 			int firstPhysAddress = Machine.processor().makeAddress(pageTable[i].ppn, offset1);
-			//int lastPhysAddress = Machine.processor().makeAddress(pageTable[i].ppn, offset2);
+
 			System.arraycopy(memory, firstPhysAddress, data, offset+numBytesTransferred, offset2-offset1);
 			numBytesTransferred += (offset2-offset1);
 			pageTable[i].used = true;
@@ -243,11 +239,12 @@ public class UserProcess {
 			length = Machine.processor().makeAddress(numPages - 1, pageSize - 1) - vaddr;
 		}
 
+		int vadx = vaddr + length;
 		int firstVirtPage = Machine.processor().pageFromAddress(vaddr);
-		int lastVirtPage = Machine.processor().pageFromAddress(vaddr + length);
+		int lastVirtPage = Machine.processor().pageFromAddress(vadx);
 
 		int numBytesTransferred = 0;
-		for (int i=firstVirtPage; i<=lastVirtPage; i++){
+		for (int i=firstVirtPage; i <= lastVirtPage; i++){
 			if (!pageTable[i].valid || pageTable[i].readOnly) {
 				break;
 			}
@@ -257,18 +254,18 @@ public class UserProcess {
 			int offset1;
 			int offset2;
 
-			if (vaddr <= firstVirtAddress && vaddr+length >= lastVirtAddress){
+			if (vaddr <= firstVirtAddress && vadx >= lastVirtAddress){
 				offset1 = 0;
 				offset2 = pageSize - 1;
-			}  else if (vaddr > firstVirtAddress && vaddr+length >= lastVirtAddress){
+			}  else if (vaddr > firstVirtAddress && vadx >= lastVirtAddress){
 				offset1 = vaddr - firstVirtAddress;
 				offset2 = pageSize - 1;
-			} else if (vaddr <= firstVirtAddress && vaddr+length < lastVirtAddress){
+			} else if (vaddr <= firstVirtAddress && vadx < lastVirtAddress){
 				offset1 = 0;
-				offset2 = (vaddr + length) - firstVirtAddress;
+				offset2 = (vadx) - firstVirtAddress;
 			}  else {
 				offset1 = vaddr - firstVirtAddress;
-				offset2 = (vaddr + length) - firstVirtAddress;
+				offset2 = (vadx) - firstVirtAddress;
 			}
 
 			int firstPhysAddress = Machine.processor().makeAddress(pageTable[i].ppn, offset1);
