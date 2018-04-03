@@ -808,25 +808,14 @@ private int handleJoin(int childProcessId, int status) {
     private int handleClose(int a0) {                                    
 	    
         int handle = a0;                                                  
-        if (a0 < 0 || a0 >= 16)                                        
+        if ( (a0 < 0)  || (a0 > 15) || (fileDescriptorTable[a0] == null) )                                        
             return -1;                                                    
 
-        boolean retval = true;                                           
-
-        FileDescriptor fd = fds[handle];                                  
-                                            
-        fd.file.close();                                                  
-        fd.file = null;                                                   
-
-        // remove this file if necessary                                  
-        if (fd.toRemove) {                                               
-        retval = UserKernel.fileSystem.remove(fd.filename);           
-            fd.toRemove = false;                                            
-        }                                                                 
-
-        fd.filename = "";                                                 
-
-        return retval ? 0 : -1;                                           
+        fileDescriptorTable[a0].close();
+        fileDescriptorTable[a0] = null; 
+        return 0; 
+                                 
+                                                   
     }     
     
     private int handleUnlink(int a0) {
