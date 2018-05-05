@@ -890,14 +890,14 @@ public class UserProcess {
 	private static final char dbgProcess = 'a';
 
 	// constants
-	private static final int MAX_FD = 16;
+	public static final int MAX_FD = 16;
 	private static final int EXIT_STATUS_ERR = -1;
 	private static final int MAX_FILE_LEN = 256;
 	private static final String DEFAULT_ERROR_TEXT = "[ERROR]";
 
 
 	// new variables for project 2
-	private OpenFile[] fileDescriptorTable;
+	public OpenFile[] fileDescriptorTable;
 	private LinkedList<UserProcess> childProcesses;
 	private UserProcess parentProcess;
 	private static int processIdCounter = 0;

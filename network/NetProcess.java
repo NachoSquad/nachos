@@ -1,9 +1,12 @@
+
 package nachos.network;
 
 import nachos.machine.*;
 import nachos.threads.*;
 import nachos.userprog.*;
 import nachos.vm.*;
+import java.util.LinkedList;
+
 
 /**
  * A <tt>VMProcess</tt> that supports networking syscalls.
@@ -13,13 +16,106 @@ public class NetProcess extends VMProcess {
      * Allocate a new process.
      */
     public NetProcess() {
-	super();
+        super();
+
+        freePorts = new LinkedList<Integer>();
+        for (int i=0; i<MailMessage.portLimit; i++) {
+            freePorts.offer(i);
+        }
+
+        plock = new Lock();
     }
 
     private static final int
 	syscallConnect = 11,
 	syscallAccept = 12;
-    
+
+
+    //  connect
+    private int connect(int host, int port){
+        if(port < 0 || port >= MailMessage.portLimit){
+            return -1;
+        }
+        int fd = 0;
+        for (; fd < MAX_FD; fd++) {
+            if(fileDescriptorTable[fd] == null) {
+                break;
+            }
+        }
+        if (fd == MAX_FD) {
+            return -1;
+        }
+
+        int myPort = getPort();
+
+        final int I = fd;
+        Runnable closer = new Runnable(){ public void run(){fileDescriptorTable[I]=null;}};
+        Connection theFile = new Connection(myPort, Machine.networkLink().getLinkAddress(), port, host, closer);
+
+        theFile.open();
+
+        fileDescriptorTable[fd] = theFile;
+        return fd;
+    }
+
+    private int accept(int port){
+        if(port < 0 || port >= MailMessage.portLimit){
+            return -1;
+        }
+        int fd = 0;
+        for (; fd < MAX_FD; fd++) {
+            if(fileDescriptorTable[fd] == null) {
+                break;
+            }
+        }
+        if (fd == MAX_FD) {
+            return -1;
+        }
+        Connection theFile;
+        MailMessage nm;
+        try {
+            nm = NetKernel.postOffice.receive(port);
+        }
+        catch (Exception e) {
+            return -1;
+        }
+        if (!nm.getFlags()[3] || nm==null) {
+            return -1;
+        }
+
+        final int I = fd;
+        Runnable closer = new Runnable(){ public void run(){fileDescriptorTable[I]=null;}};
+        theFile = new Connection(nm,closer);
+
+        theFile.recievedSyn();
+
+        fileDescriptorTable[fd] = theFile;
+        return fd;
+    }
+
+    // lock for ports
+    private Lock plock;
+
+    // list of unused ports
+    private final LinkedList<Integer> freePorts;
+
+    // get unused port
+    private int getPort(){
+        int ret;
+        plock.acquire();
+        ret = freePorts.poll();
+        plock.release();
+        return ret;
+    }
+
+    // release port
+    private void releasePort(int port){
+        plock.acquire();
+        freePorts.offer(port);
+        plock.release();
+        return;
+    }
+
     /**
      * Handle a syscall exception. Called by <tt>handleException()</tt>. The
      * <i>syscall</i> argument identifies which syscall the user executed:
@@ -39,8 +135,12 @@ public class NetProcess extends VMProcess {
      */
     public int handleSyscall(int syscall, int a0, int a1, int a2, int a3) {
 	switch (syscall) {
-	default:
-	    return super.handleSyscall(syscall, a0, a1, a2, a3);
-	}
+        case syscallConnect:
+            return connect(a0, a1);
+        case syscallAccept:
+            return accept(a0);
+        default:
+            return super.handleSyscall(syscall, a0, a1, a2, a3);
+        }
     }
 }
