@@ -31,7 +31,7 @@ public class NetProcess extends VMProcess {
 	syscallAccept = 12;
 
 
-    //  connect
+    //  connect retrieves a file descriptor along with our network infromation to call a request (SYN) to a service
     private int connect(int host, int port){
         if(port < 0 || port >= MailMessage.portLimit){
             return -1;
@@ -48,8 +48,12 @@ public class NetProcess extends VMProcess {
 
         int myPort = getPort();
 
-        final int I = fd;
-        Runnable closer = new Runnable(){ public void run(){fileDescriptorTable[I]=null;}};
+        final int fileDescriptorIndex = fd;
+        Runnable closer = new Runnable(){
+            public void run(){
+                fileDescriptorTable[fileDescriptorIndex] = null;
+            }
+        };
         Connection theFile = new Connection(myPort, Machine.networkLink().getLinkAddress(), port, host, closer);
 
         theFile.open();
@@ -58,38 +62,51 @@ public class NetProcess extends VMProcess {
         return fd;
     }
 
+    // accept is the opposite of this as it allows us to accept a connection from somwhere
     private int accept(int port){
         if(port < 0 || port >= MailMessage.portLimit){
             return -1;
         }
+
         int fd = 0;
+
         for (; fd < MAX_FD; fd++) {
             if(fileDescriptorTable[fd] == null) {
                 break;
             }
         }
+
         if (fd == MAX_FD) {
             return -1;
         }
+
         Connection theFile;
         MailMessage nm;
+
         try {
             nm = NetKernel.postOffice.receive(port);
-        }
-        catch (Exception e) {
+        } catch (Exception e) {
             return -1;
         }
+
         if (!nm.getFlags()[3] || nm==null) {
             return -1;
         }
 
-        final int I = fd;
-        Runnable closer = new Runnable(){ public void run(){fileDescriptorTable[I]=null;}};
+        final int fileDescriptorIndex = fd;
+        // this runnable closes all the fd table
+        Runnable closer = new Runnable(){
+            public void run(){
+                fileDescriptorTable[fileDescriptorIndex] = null;
+            }
+        };
+
         theFile = new Connection(nm,closer);
 
         theFile.recievedSyn();
 
         fileDescriptorTable[fd] = theFile;
+
         return fd;
     }
 
@@ -101,11 +118,11 @@ public class NetProcess extends VMProcess {
 
     // get unused port
     private int getPort(){
-        int ret;
+        int nextPort;
         plock.acquire();
-        ret = freePorts.poll();
+        nextPort = freePorts.poll();
         plock.release();
-        return ret;
+        return nextPort;
     }
 
     // release port

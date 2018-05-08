@@ -11,28 +11,8 @@ import java.util.ArrayList;
  */
 
 public class Connection extends OpenFile {
-    /** Constant flag variables for convinience */
-    private static final boolean[] DATA_FLAGS = {false,false,false,false};
-    private static final boolean[] SYN_FLAGS = {false,false,false,true};
-    private static final boolean[] ACK_FLAGS = {false,false,true,false};
-    private static final boolean[] STP_FLAGS = {false,true,false,false};
-    private static final boolean[] FIN_FLAGS = {true,false,false,false};
 
-    /** for adding flags to presets */
-    private static final boolean[] addFlag(boolean[] flags, int toAdd){
-        boolean[] ret = new boolean[4];
-        for (int i=0; i<4; i++) {
-            ret[i]=flags[i]||(i==toAdd);
-        }
-        return ret;
-    }
-
-    /** Constructor!
-     * This will be called when creating a new connection
-     * The source and destination ports and nodes are
-     * stored as members for future use.
-     * The current and expected sequence numbers are set to 0
-     */
+    // our constructor
     public Connection(int srcPort, int srcNode, int dstPort, int dstNode, Runnable closer){
         super(null, "Connection");
         this.srcPort = srcPort;
@@ -47,14 +27,9 @@ public class Connection extends OpenFile {
         this.PO = NetKernel.postOffice;
     }
 
-    /**
-     * This will be called when creating a new connection
-     * The source and destination ports and nodes are
-     * taken from the SYN packet then stored as members for future use.
-     * The current and expected sequence numbers are set to 0
-     */
+    // special constructor called when we are sending a SYN packet
     public Connection(MailMessage SYN, Runnable closer){
-        this(SYN.dstPort,SYN.packet.dstLink,SYN.srcPort,SYN.packet.srcLink,closer);
+        this(SYN.dstPort, SYN.packet.dstLink, SYN.srcPort, SYN.packet.srcLink, closer);
     }
 
     /**
@@ -242,23 +217,40 @@ public class Connection extends OpenFile {
         return written;
     }
 
-    /** Keeps track of the connectedness */
-    public boolean isConnected;
-
-    /** Addresses of source, destination */
-    private int srcPort, srcNode, dstNode, dstPort;
-
-    /** Curr is what you send, expected is what you receive */
-    private int currSeqno, expectedSeqno;
-
-    /** This will cache the extra bytes read */
-    private ArrayList<Byte> readCache;
-
-    /** This will close the connection */
+    // runnable that closes the connection
     private Runnable closer;
 
-    /** this is just a reference to the NetKernel PO */
+
+    // connected state
+    public boolean isConnected;
+
+    // connection details
+    private int srcPort, srcNode, dstNode, dstPort;
+
+    // sequence jnumbers
+    private int currSeqno, expectedSeqno;
+
+    // our cache
+    private ArrayList<Byte> readCache;
+
+    // post office reference
     private PostOffice PO;
 
     public static final int maxContentSize = Packet.maxContentsLength - MailMessage.headerLength;
+
+    // flags
+    private static final boolean[] DATA_FLAGS = {false, false, false, false};
+    private static final boolean[] SYN_FLAGS = {false, false, false, true};
+    private static final boolean[] ACK_FLAGS = {false, false, true, false};
+    private static final boolean[] STP_FLAGS = {false, true, false, false};
+    private static final boolean[] FIN_FLAGS = {true, false, false, false};
+
+    // helper function that adds flags
+    private static final boolean[] addFlag(boolean[] flags, int toAdd){
+        boolean[] ret = new boolean[4];
+        for (int i=0; i<4; i++) {
+            ret[i]=flags[i]||(i==toAdd);
+        }
+        return ret;
+    }
 }

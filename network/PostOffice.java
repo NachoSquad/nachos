@@ -30,9 +30,9 @@ public class PostOffice {
 		lock = new Lock();
 		cond = new Condition(lock);
 
-		queues = new SynchList2[MailMessage.portLimit];
+		queues = new LockList[MailMessage.portLimit];
 		for (int i=0; i<queues.length; i++)
-			queues[i] = new SynchList2();
+			queues[i] = new LockList();
 
 		Runnable receiveHandler = new Runnable() {
 			public void run() { receiveInterrupt(); }
@@ -176,7 +176,7 @@ public class PostOffice {
 		messageSent.V();
 	}
 
-	private SynchList2[] queues;
+	private LockList[] queues;
 	private SynchList sendList;
 	private Semaphore messageReceived;	// V'd when a message can be dequeued
 	private Semaphore messageSent;	// V'd when a message can be queued
