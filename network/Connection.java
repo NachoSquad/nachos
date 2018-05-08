@@ -12,7 +12,7 @@ import java.util.ArrayList;
 
 public class Connection extends OpenFile {
     /** Constant flag variables for convinience */
-    private static final boolean[] STD_FLAGS = {false,false,false,false};
+    private static final boolean[] DATA_FLAGS = {false,false,false,false};
     private static final boolean[] SYN_FLAGS = {false,false,false,true};
     private static final boolean[] ACK_FLAGS = {false,false,true,false};
     private static final boolean[] STP_FLAGS = {false,true,false,false};
@@ -47,7 +47,7 @@ public class Connection extends OpenFile {
         this.PO = NetKernel.postOffice;
     }
 
-    /** Constructor!
+    /**
      * This will be called when creating a new connection
      * The source and destination ports and nodes are
      * taken from the SYN packet then stored as members for future use.
@@ -96,48 +96,81 @@ public class Connection extends OpenFile {
     }
 
     /**
-     * Tries to read the next packet's contents into
-     * the given buffer.
-     * Returns bytes read.
+     * read()
+     * Takes a given buffer and returns the bytes read
      */
     public int read(byte[] buf, int offset, int length) {
         int toRead = Math.min(offset+buf.length,length);
         int read = 0;
 
-        if(!readCache.isEmpty()){
-            int t = Math.min(toRead,readCache.size());
-            System.arraycopy(readCache.toArray(new Byte[t]),0,buf,offset,t);
+        if(!readCache.isEmpty()) {
+            // read the data since it's not empty
+            int data = Math.min(toRead, readCache.size());
+
+            System.arraycopy(readCache.toArray(new Byte[t]), 0, buf, offset, data);
             read += t;
-            for(int i=0;i<t;i++) readCache.remove(0);
+            for(int i=0; i < t; i++) {
+                readCache.remove(0);
+            }
         }
 
-        if (!isConnected) { return read; }
+        // close if everything is read
+        if (!isConnected) {
+            return read;
+        }
 
-        while (read<toRead) {
+        while (read < toRead) {
             MailMessage nm = PO.receive(srcPort);
-            if (nm == null) { break; }
 
-            if (nm.getFlags()[1]) { //this is a stop
+            // die is we have no message
+            if (nm == null) {
+                break;
+            }
+
+            if (nm.getFlags()[1]) {
+                // start sending a fin
                 MailMessage FIN;
-                try{ FIN = new MailMessage(dstNode,dstPort,srcNode,srcPort,FIN_FLAGS,0,new byte[0]);}
-                catch (Exception e) { System.out.println(e); closer.run(); return -1;}
+                try{
+                    FIN = new MailMessage(
+                            dstNode,
+                            dstPort,
+                            srcNode,
+                            srcPort,
+                            FIN_FLAGS,
+                            0,
+                            new byte[0])
+                } catch (Exception e) {
+                    // if we fail we fail
+                    System.out.println(e);
+                    closer.run();
+                    return -1;
+                }
+
                 PO.send(FIN);
 
+                // close connection
                 isConnected = false;
                 closer.run();
                 break;
             }
 
-            if(nm.getSeqno()!=expectedSeqno){System.out.println("Out of order packet!");}
-            expectedSeqno = nm.getSeqno()+1;
+
+            // check if our packet sequence number is not correct
+            if (nm.getSeqno() != expectedSeqno) {
+                System.out.println("Out of order packet!");
+            }
+
+            // get next sequence number
+            expectedSeqno = nm.getSeqno() + 1;
 
             byte[] contents = nm.contents;
 
-            for (int i=0; i<contents.length; i++) {
-                if(toRead!=read){
+            // read
+            for (int i=0; i < contents.length; i++) {
+                if (toRead != read) {
                     buf[offset+read] = contents[i];
                     read++;
-                }else {
+                } else {
                     readCache.add(contents[i]);
                 }
             }
@@ -147,24 +180,33 @@ public class Connection extends OpenFile {
     }
 
 
-    /** ONLY TO BE CALLED BY THE POST OFFICE
-     * This replies with an ACK
-     * when we recieve a SYN or FIN
-     * "connectedness" should be true if we recieved a SYN
-     * else false.
+    /**
+     * This will send an ACK back to the user
      */
     public void recievedSyn(){
         MailMessage ACK;
-        try{ ACK = new MailMessage(dstNode,dstPort,srcNode,srcPort,ACK_FLAGS,0,new byte[0]);}
-        catch (Exception e) { System.out.println(e); closer.run(); return;}
+        try{
+            ACK = new MailMessage(
+                    dstNode,
+                    dstPort,
+                    srcNode,
+                    srcPort,
+                    ACK_FLAGS,
+                    0,
+                    new byte[0]);
+        } catch (Exception e) {
+            System.out.println(e);
+            closer.run();
+            return;
+        }
+
+        // die
         PO.send(ACK);
         isConnected = true;
     }
 
     /**
-     * Tries to send the specified bytes
-     * in a packet to the reciever.
-     * Returns bytes sent.
+     * Sends bytes via a DATA_FLAG
      */
     public int write(byte[] buf, int offset, int length) {
         if (!isConnected) { return -1; }
@@ -177,13 +219,25 @@ public class Connection extends OpenFile {
             System.arraycopy(buf,offset+written,contents,0,contents.length);
 
             MailMessage nm;
-            try{ nm = new MailMessage(dstNode,dstPort,srcNode,srcPort,STD_FLAGS,currSeqno,contents);}
-            catch (Exception e) { System.out.println(e); closer.run(); return -1;}
+            try{
+                nm = new MailMessage(
+                        dstNode,
+                        dstPort,
+                        srcNode,
+                        srcPort,
+                        DATA_FLAGS,
+                        currSeqno,
+                        contents);
+            } catch (Exception e) {
+                System.out.println(e);
+                closer.run();
+                return -1;
+            }
 
             PO.send(nm);
 
             currSeqno++;
-            written+=contents.length;
+            written += contents.length;
         }
         return written;
     }
