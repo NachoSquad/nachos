@@ -1,7 +1,11 @@
 package nachos.network;
 
+import java.util.Random;
+import java.util.Vector;
+
 import nachos.machine.*;
 import nachos.threads.*;
+
 
 /**
  * A collection of message queues, one for each local port. A
@@ -22,17 +26,15 @@ public class PostOffice {
 	 * "postal worker" thread.
 	 */
 	public PostOffice() {
+		linkAddress = Machine.networkLink().getLinkAddress();
+
 		messageReceived = new Semaphore(0);
 		messageSent = new Semaphore(0);
-		sendSema = new Semaphore(BUF_SIZE);
-		sendList = new SynchList();
+		sendLock = new Lock();
 
-		lock = new Lock();
-		cond = new Condition(lock);
-
-		queues = new LockList[MailMessage.portLimit];
+		queues = new SynchList[MailMessage.portLimit];
 		for (int i=0; i<queues.length; i++)
-			queues[i] = new LockList();
+			queues[i] = new SynchList();
 
 		Runnable receiveHandler = new Runnable() {
 			public void run() { receiveInterrupt(); }
@@ -51,11 +53,11 @@ public class PostOffice {
 	}
 
 	/**
-	 * Retrieve a message on the specified port, returning null if empty.
+	 * Retrieve a message on the specified port, waiting if necessary.
 	 *
 	 * @param	port	the port on which to wait for a message.
 	 *
-	 * @return	the message received
+	 * @return	the message received.
 	 */
 	public MailMessage receive(int port) {
 		Lib.assertTrue(port >= 0 && port < queues.length);
@@ -63,34 +65,6 @@ public class PostOffice {
 		Lib.debug(dbgNet, "waiting for mail on port " + port);
 
 		MailMessage mail = (MailMessage) queues[port].removeFirst();
-
-		if (Lib.test(dbgNet))
-			System.out.println("got mail on port " + port + ": " + mail);
-
-		return mail;
-	}
-
-	/**
-	 * Retrieve a message on the specified port, waiting if necessary.
-	 *
-	 * @param	port	the port on which to wait for a message.
-	 *
-	 * @return	the message received
-	 */
-	public MailMessage bReceive(int port) {
-		Lib.assertTrue(port >= 0 && port < queues.length);
-
-		Lib.debug(dbgNet, "waiting for mail on port " + port);
-
-
-		MailMessage mail = null;
-
-		lock.acquire();
-		while (mail==null) {
-			cond.sleep();
-			mail = (MailMessage) queues[port].removeFirst();
-		}
-		lock.release();
 
 		if (Lib.test(dbgNet))
 			System.out.println("got mail on port " + port + ": " + mail);
@@ -120,10 +94,8 @@ public class PostOffice {
 				System.out.println("delivering mail to port " + mail.dstPort
 						+ ": " + mail);
 
-			if (queues[mail.dstPort].size() != BUF_SIZE) {
-				// atomically add message to the mailbox and wake a waiting thread
-				queues[mail.dstPort].add(mail);
-			}
+			// atomically add message to the mailbox and wake a waiting thread
+			queues[mail.dstPort].add(mail);
 		}
 	}
 
@@ -133,10 +105,6 @@ public class PostOffice {
 	 */
 	private void receiveInterrupt() {
 		messageReceived.V();
-
-		lock.acquire();
-		cond.wake();
-		lock.release();
 	}
 
 	/**
@@ -146,26 +114,13 @@ public class PostOffice {
 		if (Lib.test(dbgNet))
 			System.out.println("sending mail: " + mail);
 
-		sendSema.P();
-		sendList.add(mail);
+		sendLock.acquire();
+
+		Machine.networkLink().send(mail.packet);
+		messageSent.P();
+
+		sendLock.release();
 	}
-
-	/**
-	 * Wait for a message to be added to the sendlist, then send it.
-	 */
-	private void postalSendery() {
-		while(true){
-			MailMessage mail = (MailMessage) sendList.removeFirst();
-
-			if (Lib.test(dbgNet))
-				System.out.println("sending mail to port " + mail.dstPort + ": " + mail);
-
-			Machine.networkLink().send(mail.packet);
-			messageSent.P();
-			sendSema.V();
-		}
-	}
-
 
 	/**
 	 * Called when a packet has been sent and another can be queued to the
@@ -176,16 +131,81 @@ public class PostOffice {
 		messageSent.V();
 	}
 
-	private LockList[] queues;
-	private SynchList sendList;
+
+	public OpenFile handleConnect(int id, int port) throws MalformedPacketException
+	{
+		int newPort =-1;
+		boolean status = true;
+		int i=0;
+		while(i < maxPorts + 30)
+		{
+			newPort = (new Random()).nextInt(maxPorts);
+			if (! activeConnections.contains (linkAddress + ":" + newPort + ":" + id + ":" + port) )
+				break;
+
+			if (i == maxPorts - 1)
+			{
+				status = false;
+				break;
+			}
+			++i;
+		}
+
+		if(status == false)
+		{
+			return null;
+		}
+
+		Connection ch = new Connection(linkAddress, newPort, id, port);
+
+		activeConnections.add(linkAddress + ":" + newPort + ":" + id + ":" + port);
+		connectionList.add(ch);
+
+		OpenFile retval = ch.connectToSrv();
+		if(retval == null)
+		{
+			activeConnections.remove(linkAddress + ":" + newPort + ":" + id + ":" + port);
+			connectionList.remove(ch);
+		}
+		return retval;
+	}
+
+	public OpenFile handleAccept(int port) throws MalformedPacketException
+	{
+		MailMessage msg = receive(port);
+		if(msg == null)
+		{
+			return null;
+		}
+		byte flag = msg.contents[0];
+		if(flag == Message.SYN)
+		{
+			// create a new connection
+			Connection ch = new Connection(linkAddress, port, msg.packet.srcLink, msg.srcPort);
+			ch.state = Connection.ConnectionState.SYN_RCVD;
+			activeConnections.add(linkAddress + ":" + port + ":" + msg.packet.srcLink + ":" + msg.srcPort);
+			connectionList.add(ch);
+			// send a SYN_ACK
+			byte[] contents = new byte[1];
+			contents[0] = Message.SYN_ACK;
+			MailMessage syngenerateACK = new MailMessage(msg.packet.srcLink, msg.srcPort, linkAddress, port, contents);
+			send(syngenerateACK);
+			ch.state = Connection.ConnectionState.ESTABLISHED;
+			ch.startRecieverThread();
+			return ch;
+		}
+		return null;
+	}
+
+
+	private SynchList[] queues;
 	private Semaphore messageReceived;	// V'd when a message can be dequeued
 	private Semaphore messageSent;	// V'd when a message can be queued
-	private Semaphore sendSema; // Enforce that the sendList stays under 16 items
-
-	/** for breceive */
-	private Lock lock;
-	private Condition cond;
+	private Lock sendLock;
+	public final static int maxPorts = 128;
+	private int linkAddress;
+	private Vector<String> activeConnections = new Vector<String> ();
+	private Vector<Connection> connectionList = new Vector<Connection> ();
 
 	private static final char dbgNet = 'n';
-	private static final int BUF_SIZE = 16;
 }

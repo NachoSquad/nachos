@@ -541,7 +541,7 @@ public class UserProcess {
 		return nextFDIndex;
 	}
 
-	private int handleRead(int fileDescriptor, int bufferAddr, int count){
+	protected int handleRead(int fileDescriptor, int bufferAddr, int count){
 		int bytesRead = 0;
 		int returnAmount = 0;
 
@@ -606,7 +606,7 @@ public class UserProcess {
 		return returnAmount;
 	}
 
-	private int handleClose(int fileDescriptor){
+	protected int handleClose(int fileDescriptor){
 		if ((fileDescriptor < 0) ||
 				(fileDescriptor > 15) ||
 				fileDescriptorTable[fileDescriptor] == null ) {
@@ -618,7 +618,7 @@ public class UserProcess {
 		return 0;
 	}
 
-	private int handleUnlink(String name){
+	public int handleUnlink(String name){
 		boolean succeeded = ThreadedKernel.fileSystem.remove(name);
 		if (!succeeded) {
 			return -1;
@@ -760,7 +760,7 @@ public class UserProcess {
 		return 0;
 	}
 
-	private static final int
+	public static final int
 			syscallHalt   = 0,
 			syscallExit   = 1,
 			syscallExec   = 2,

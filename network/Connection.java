@@ -1,256 +1,282 @@
-package nachos.userprog;
+package nachos.network;
 
-import nachos.machine.*;
-import nachos.threads.*;
-import nachos.userprog.*;
-import nachos.network.*;
-import java.util.ArrayList;
+import java.util.LinkedList;
+import java.util.Vector;
 
-/**
- * This file is user-generated and is used to be for connections
- */
+import nachos.machine.MalformedPacketException;
+import nachos.machine.OpenFile;
+import nachos.threads.KThread;
+import nachos.threads.Lock;
+import nachos.threads.Semaphore;
+import nachos.threads.SynchList;
+import nachos.network.Message;
 
 public class Connection extends OpenFile {
 
-    // our constructor
-    public Connection(int srcPort, int srcNode, int dstPort, int dstNode, Runnable closer){
-        super(null, "Connection");
+
+
+    public Connection(int srcId, int srcPort, int destId, int destPort)
+    {
+        this.srcId = srcId;
         this.srcPort = srcPort;
-        this.srcNode = srcNode;
-        this.dstPort = dstPort;
-        this.dstNode = dstNode;
-        this.closer = closer;
-        this.currSeqno = 0;
-        this.expectedSeqno = 0;
-        this.isConnected = false;
-        this.readCache = new ArrayList<Byte>();
-        this.PO = NetKernel.postOffice;
+        this.destId = destId;
+        this.destPort = destPort;
+        state = ConnectionState.CLOSED;
+        slidingWnd = new Window();
+    }
+    public static void changeState(ConnectionState newState) {
+        state = newState;
     }
 
-    // special constructor called when we are sending a SYN packet
-    public Connection(MailMessage SYN, Runnable closer){
-        this(SYN.dstPort, SYN.packet.dstLink, SYN.srcPort, SYN.packet.srcLink, closer);
+    public OpenFile connectToSrv() throws MalformedPacketException {
+        if(state != ConnectionState.CLOSED) {
+            return null;
+        }
+
+        byte[] content = new byte[1];
+        content[0] = Message.SYN;
+        MailMessage msg = new MailMessage (destId, destPort, srcId, srcPort, content);
+        NetKernel.postOffice.send(msg);
+        state = ConnectionState.SYN_SENT;
+
+        /**
+         * Wait for SYN-ACK
+         */
+        MailMessage responseMessage = NetKernel.postOffice.receive(srcPort);
+
+        byte responseFlag = responseMessage.contents[0];
+        if(responseFlag ==  Message.SYN_ACK) {
+            state = ConnectionState.ESTABLISHED;
+            startRecieverThread();
+            return this;
+        }
+
+        return null;
     }
 
-    /**
-     * Initiates the 2-way open handshake by sending a SYN
-     */
-    public void open() {
-        if (isConnected) { return; }
-        MailMessage SYN;
-        try{ SYN = new MailMessage(dstNode,dstPort,srcNode,srcPort,SYN_FLAGS,0,new byte[0]);}
-        catch (Exception e) { System.out.println(e); closer.run(); return;}
-        PO.send(SYN);
-        MailMessage nm;
-        do {
-            nm = PO.bReceive(srcPort);
-        } while (nm.getFlags()[2]);
-        isConnected = true;
-    }
-
-    /**
-     * Closes the connection with a FIN-ACK
-     */
     public void close() {
-        if (!isConnected) {
+        if(state == ConnectionState.CLOSED) {
             return;
         }
 
-        MailMessage STP;
-        try{ STP = new MailMessage(dstNode,dstPort,srcNode,srcPort,STP_FLAGS,0,new byte[0]);}
-        catch (Exception e) { System.out.println(e); closer.run(); return;}
-        PO.send(STP);
+        byte[] content = new byte[1];
+        content[0] = Message.FIN;
+        MailMessage msg;
+        try {
+            msg = new MailMessage (destId, destPort, srcId, srcPort, content);
 
-        while (isConnected) {
-            if (PO.bReceive(srcPort).getFlags()[0]) {
-                isConnected = false;
-            }
+            NetKernel.postOffice.send(msg);
+            state = ConnectionState.CLOSING;
+        } catch (MalformedPacketException e) {
+            e.printStackTrace();
         }
-
-        closer.run();
+        return;
     }
 
-    /**
-     * read()
-     * Takes a given buffer and returns the bytes read
-     */
+
     public int read(byte[] buf, int offset, int length) {
-        int toRead = Math.min(offset+buf.length,length);
-        int read = 0;
-
-        if(!readCache.isEmpty()) {
-            // read the data since it's not empty
-            int data = Math.min(toRead, readCache.size());
-
-            System.arraycopy(readCache.toArray(new Byte[t]), 0, buf, offset, data);
-            read += t;
-            for(int i=0; i < t; i++) {
-                readCache.remove(0);
-            }
+        if(state != ConnectionState.ESTABLISHED) {
+            return -1;
         }
 
-        // close if everything is read
-        if (!isConnected) {
-            return read;
+        int bytesRecieved = 0;
+
+        QueueLock.acquire();
+        while(MessageInQueue.size() > 0) {
+            MailMessage msg = MessageInQueue.removeFirst();
+            try {
+                System.arraycopy(msg.contents, 3, buf, bytesRecieved, msg.contents.length - 3);
+            } catch(Exception e) {
+
+            }
+
+            bytesRecieved += msg.contents.length - 3;
         }
+        QueueLock.release();
 
-        while (read < toRead) {
-            MailMessage nm = PO.receive(srcPort);
-
-            // die is we have no message
-            if (nm == null) {
-                break;
-            }
-
-            if (nm.getFlags()[1]) {
-                // start sending a fin
-                MailMessage FIN;
-                try{
-                    FIN = new MailMessage(
-                            dstNode,
-                            dstPort,
-                            srcNode,
-                            srcPort,
-                            FIN_FLAGS,
-                            0,
-                            new byte[0])
-                } catch (Exception e) {
-                    // if we fail we fail
-                    System.out.println(e);
-                    closer.run();
-                    return -1;
-                }
-
-                PO.send(FIN);
-
-                // close connection
-                isConnected = false;
-                closer.run();
-                break;
-            }
-
-
-            // check if our packet sequence number is not correct
-            if (nm.getSeqno() != expectedSeqno) {
-                System.out.println("Out of order packet!");
-            }
-
-            // get next sequence number
-            expectedSeqno = nm.getSeqno() + 1;
-
-            byte[] contents = nm.contents;
-
-            // read
-            for (int i=0; i < contents.length; i++) {
-                if (toRead != read) {
-                    buf[offset+read] = contents[i];
-                    read++;
-                } else {
-                    readCache.add(contents[i]);
-                }
-            }
-        }
-
-        return read;
+        return bytesRecieved;
     }
 
 
-    /**
-     * This will send an ACK back to the user
-     */
-    public void recievedSyn(){
-        MailMessage ACK;
-        try{
-            ACK = new MailMessage(
-                    dstNode,
-                    dstPort,
-                    srcNode,
-                    srcPort,
-                    ACK_FLAGS,
-                    0,
-                    new byte[0]);
-        } catch (Exception e) {
-            System.out.println(e);
-            closer.run();
-            return;
-        }
-
-        // die
-        PO.send(ACK);
-        isConnected = true;
-    }
-
-    /**
-     * Sends bytes via a DATA_FLAG
-     */
     public int write(byte[] buf, int offset, int length) {
-        if (!isConnected) { return -1; }
-        int toWrite = Math.min(length,buf.length-offset);
-        int written = 0;
+        if(state != ConnectionState.ESTABLISHED) {
+            return -1;
+        }
 
-        while(written!=toWrite){
-            byte[] contents = new byte[Math.min(toWrite-written,maxContentSize)];
+        int netPayload = DataMessage.maxPayload;
+        int numMessages = calcNumMessages(length, MailMessage.maxContentsLength - 3);
+        int lastMessageLength = lastMessageLen(length, MailMessage.maxContentsLength - 3);
 
-            System.arraycopy(buf,offset+written,contents,0,contents.length);
+        int idx = 0;
+        int bytesSent = 0;
+        for(int i = 0; i < numMessages - 1; ++i) {
+            byte[] contents = new byte[netPayload];
 
-            MailMessage nm;
-            try{
-                nm = new MailMessage(
-                        dstNode,
-                        dstPort,
-                        srcNode,
-                        srcPort,
-                        DATA_FLAGS,
-                        currSeqno,
-                        contents);
-            } catch (Exception e) {
-                System.out.println(e);
-                closer.run();
-                return -1;
+            System.arraycopy(buf, idx, contents, 0, netPayload);
+
+            idx += netPayload;
+            MailMessage msg = null;
+
+            try {
+                DataMessage dm = new DataMessage(destId, destPort, srcId, srcPort, contents, sendMsgId);
+                sendMsgId++;
+                msg = dm.mailMsg();
+
+            } catch (MalformedPacketException e) {
+                e.printStackTrace();
             }
 
-            PO.send(nm);
+            /**
+             * Check if sliding window is full, if it is we wait for the reciever to wake up the system
+             */
+            QueueLock.acquire();
+            if(slidingWnd.isWindowFull()) {
+                QueueLock.release();
+                sema.P();
+            } else {
+                slidingWnd.sentMsgIdList.add(new Short((short)(sendMsgId - 1)));
+                QueueLock.release();
+            }
 
-            currSeqno++;
-            written += contents.length;
+            // Sends data
+            NetKernel.postOffice.send(msg);
+            bytesSent += netPayload;
         }
-        return written;
+
+        if(lastMessageLength > 0) {
+            // last msg
+            byte[] contents = new byte[lastMessageLength];
+            System.arraycopy(buf, idx, contents, 0, lastMessageLength);
+            MailMessage msg = null;
+            try {
+                DataMessage dm = new DataMessage(destId, destPort, srcId, srcPort, contents, sendMsgId);
+                sendMsgId++;
+                msg = dm.mailMsg();
+            } catch (MalformedPacketException e) {
+                e.printStackTrace();
+            }
+            QueueLock.acquire();
+
+            if(slidingWnd.isWindowFull()) {
+                QueueLock.release();
+                sema.P();
+            } else {
+                slidingWnd.sentMsgIdList.add(new Short((short)(sendMsgId - 1)));
+                QueueLock.release();
+            }
+
+            NetKernel.postOffice.send(msg);
+            bytesSent += lastMessageLength;
+        }
+
+
+        return bytesSent;
     }
 
-    // runnable that closes the connection
-    private Runnable closer;
-
-
-    // connected state
-    public boolean isConnected;
-
-    // connection details
-    private int srcPort, srcNode, dstNode, dstPort;
-
-    // sequence jnumbers
-    private int currSeqno, expectedSeqno;
-
-    // our cache
-    private ArrayList<Byte> readCache;
-
-    // post office reference
-    private PostOffice PO;
-
-    public static final int maxContentSize = Packet.maxContentsLength - MailMessage.headerLength;
-
-    // flags
-    private static final boolean[] DATA_FLAGS = {false, false, false, false};
-    private static final boolean[] SYN_FLAGS = {false, false, false, true};
-    private static final boolean[] ACK_FLAGS = {false, false, true, false};
-    private static final boolean[] STP_FLAGS = {false, true, false, false};
-    private static final boolean[] FIN_FLAGS = {true, false, false, false};
-
-    // helper function that adds flags
-    private static final boolean[] addFlag(boolean[] flags, int toAdd){
-        boolean[] ret = new boolean[4];
-        for (int i=0; i<4; i++) {
-            ret[i]=flags[i]||(i==toAdd);
-        }
-        return ret;
+    int calcNumMessages(int contentLen, int netPayload) {
+        return (contentLen / netPayload) + 1;
     }
+
+    int lastMessageLen(int contentLen, int netPayLoad) {
+        return contentLen % netPayLoad;
+    }
+
+    void startRecieverThread() {
+        if(rcvLoopThread == null) {
+            rcvLoopThread = new KThread(new Reciever(srcPort, MessageInQueue, QueueLock, sema, slidingWnd));
+            rcvLoopThread.setName("connection rcv loop # " + connectionId++);
+            rcvLoopThread.fork();
+        }
+    }
+
+    private static class Reciever implements Runnable {
+        Reciever(int port, LinkedList<MailMessage> q, Lock lk, Semaphore s, Window w) {
+            this.port = port;
+            this.q = q;
+            this.lk = lk;
+            this.windowClearSema = s;
+            this.wnd = w;
+        }
+
+        public void run() {
+            while(true) {
+                MailMessage msg = NetKernel.postOffice.receive(port);
+
+                if (Message.isMessageType(msg, Message.FIN)) {
+                    sendFinAck(msg);
+                } else if (Message.isMessageType(msg, Message.FINACK)) {
+                    handleFinAck(msg);
+                } else if(Message.isMessageType(msg, Message.ACK)) {
+                    updateWindow(msg);
+                } else {
+                    sendAck(msg);
+                }
+
+                lk.acquire();
+                q.add(msg);
+                lk.release();
+            }
+        }
+
+        void sendAck(MailMessage msg) {
+            short msgId = DataMessage.getMsgId(msg);
+            try {
+                generateACK ack = new generateACK(msg.packet.srcLink, msg.srcPort, msg.packet.dstLink, msg.dstPort, msgId);
+                NetKernel.postOffice.send(ack.mailMsg());
+            } catch (MalformedPacketException e) {
+                e.printStackTrace();
+            }
+        }
+
+        void sendFinAck(MailMessage msg) {
+            changeState(ConnectionState.CLOSING);
+            short msgId = DataMessage.getMsgId(msg);
+
+            try {
+                Message finack = new Message(msg.packet.srcLink, msg.srcPort, msg.packet.dstLink, msg.dstPort, msgId, Message.FINACK);
+                NetKernel.postOffice.send(finack.mailMsg());
+
+            } catch (MalformedPacketException e) {
+                e.printStackTrace();
+            }
+            changeState(ConnectionState.CLOSED);
+        }
+
+        void handleFinAck(MailMessage msg) {
+            changeState(ConnectionState.CLOSED);
+        }
+
+        void updateWindow(MailMessage msg) {
+            int originSize = wnd.sentMsgIdList.size();
+            Short s = new Short(generateACK.getMsgId(msg));
+            lk.acquire();
+
+            if(wnd.sentMsgIdList.contains(s)) {
+                wnd.sentMsgIdList.remove(s);
+                if(originSize == Window.maxWindowCapacity) {
+                    // wake sender to send messages
+                    windowClearSema.V();
+                }
+            }
+            lk.release();
+        }
+
+        private int port;
+        private LinkedList<MailMessage> q;
+        private Lock lk;
+        private Semaphore windowClearSema;
+        private Window wnd;
+    }
+
+    public int srcId, srcPort, destId, destPort;
+    private short sendMsgId = 0;
+    KThread rcvLoopThread = null;
+    LinkedList<MailMessage> MessageInQueue = new LinkedList<MailMessage>();
+    Lock QueueLock = new Lock();
+    Semaphore sema = new Semaphore(0);
+    Window slidingWnd;
+
+    public static int connectionId = 0;
+    static ConnectionState state;
+    public static enum ConnectionState {SYN_SENT, SYN_RCVD, ESTABLISHED, STP_RCVD, STP_SENT, CLOSING, CLOSED}
 }

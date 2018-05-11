@@ -29,10 +29,10 @@ public class UserKernel extends ThreadedKernel {
             public void run() { exceptionHandler(); }
         });
 
-        // populate the pages 
+        // populate the pages
         pageList = new LinkedList<Integer>();
         int numPhysPages = Machine.processor().getNumPhysPages();
-        
+
         for(Integer i=0; i<numPhysPages; i++) {
             pageList.add(i);
         }
